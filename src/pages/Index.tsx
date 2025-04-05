@@ -2,15 +2,19 @@
 import { useState } from "react";
 import BoxDimensionsForm from "@/components/BoxDimensionsForm";
 import ItemsForm from "@/components/ItemsForm";
+import ItemsTable from "@/components/ItemsTable";
 import BoxVisualization from "@/components/BoxVisualization";
 import { PackingResult, BoxDimensions, Item } from "@/types";
 import { packItems } from "@/services/packingService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Grid2X2, List } from "lucide-react";
 
 const Index = () => {
   const [boxDimensions, setBoxDimensions] = useState<BoxDimensions | null>(null);
   const [packingResult, setPackingResult] = useState<PackingResult | null>(null);
+  const [inputMethod, setInputMethod] = useState<"form" | "table">("table");
 
   const handleBoxDimensionsSubmit = (dimensions: BoxDimensions) => {
     setBoxDimensions(dimensions);
@@ -46,10 +50,35 @@ const Index = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-8">
             <BoxDimensionsForm onSubmit={handleBoxDimensionsSubmit} />
-            <ItemsForm 
-              onSubmit={handleItemsSubmit} 
-              isDisabled={!boxDimensions}
-            />
+            
+            <div>
+              <div className="flex justify-end mb-2">
+                <Tabs value={inputMethod} onValueChange={(value) => setInputMethod(value as "form" | "table")} className="w-auto">
+                  <TabsList>
+                    <TabsTrigger value="table">
+                      <Grid2X2 className="h-4 w-4 mr-2" />
+                      Table View
+                    </TabsTrigger>
+                    <TabsTrigger value="form">
+                      <List className="h-4 w-4 mr-2" />
+                      Form View
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+              
+              {inputMethod === "form" ? (
+                <ItemsForm 
+                  onSubmit={handleItemsSubmit} 
+                  isDisabled={!boxDimensions}
+                />
+              ) : (
+                <ItemsTable
+                  onSubmit={handleItemsSubmit}
+                  isDisabled={!boxDimensions}
+                />
+              )}
+            </div>
 
             {packingResult && packingResult.unpackedItems.length > 0 && (
               <Card>
