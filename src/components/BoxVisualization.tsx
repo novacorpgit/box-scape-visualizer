@@ -70,7 +70,7 @@ const BoxVisualization = ({
             {/* Box wireframe */}
             <mesh position={[0, 0, 0]} scale={[1, 1, 1]}>
               <boxGeometry args={[scaledWidth, scaledHeight, scaledDepth]} />
-              <meshBasicMaterial color="#000000" wireframe />
+              <meshBasicMaterial wireframe={true} color="#000000" />
             </mesh>
 
             {/* Packed items */}
