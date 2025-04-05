@@ -199,10 +199,20 @@ const BoxVisualization = ({
                   const scaledItemHeight = scaleDown(item.height);
                   const scaledItemDepth = scaleDown(item.depth);
                   
-                  // Calculate item position - position is based from the bottom of the box
-                  const posX = scaleDown(item.position[0]) - (scaledWidth / 2) + (scaledItemWidth / 2);
-                  const posY = scaleDown(item.position[1]) - scaledHeight + (scaledItemHeight / 2);
-                  const posZ = scaleDown(item.position[2]) - (scaledDepth / 2) + (scaledItemDepth / 2);
+                  // Updated position calculation to ensure items stay inside box
+                  // Bottom-left-back corner of the box is at (-width/2, -height/2, -depth/2)
+                  // Item position needs to be adjusted to stay inside these boundaries
+                  const halfBoxWidth = scaledWidth / 2;
+                  const halfBoxDepth = scaledDepth / 2;
+                  
+                  // Adjust X position (left-right)
+                  const posX = (scaleDown(item.position[0]) - halfBoxWidth) + (scaledItemWidth / 2);
+                  
+                  // Adjust Y position (bottom-up)
+                  const posY = (scaleDown(item.position[1]) - scaledHeight) + (scaledItemHeight / 2);
+                  
+                  // Adjust Z position (back-front)
+                  const posZ = (scaleDown(item.position[2]) - halfBoxDepth) + (scaledItemDepth / 2);
 
                   return (
                     <mesh

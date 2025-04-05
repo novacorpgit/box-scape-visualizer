@@ -76,11 +76,11 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
               space.z + orientation.depth <= boxDepth
             ) {
               // Calculate score for this placement (lower is better)
-              // Try to minimize wasted space by placing items in corners
+              // Try to place items in the bottom, left, back corners first
               const score = 
-                (space.width - orientation.width) * 
-                (space.height - orientation.height) * 
-                (space.depth - orientation.depth);
+                (space.y * 10) + // Prioritize lower Y positions (bottom)
+                (space.x * 1) +  // Then prioritize lower X positions (left)
+                (space.z * 1);   // Then prioritize lower Z positions (back)
 
               if (score < bestScore) {
                 bestScore = score;
@@ -96,6 +96,11 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
       if (bestSpace !== -1 && bestOrientation !== null) {
         const space = spaces[bestSpace];
         
+        // Calculate the position of the item (at the bottom of the space)
+        const itemX = space.x + (bestOrientation.width / 2);
+        const itemY = space.y + (bestOrientation.height / 2);
+        const itemZ = space.z + (bestOrientation.depth / 2);
+        
         // Add the item to packed items
         const packedItem: PackedItem = {
           ...item,
@@ -103,11 +108,7 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
           width: bestOrientation.width,
           height: bestOrientation.height,
           depth: bestOrientation.depth,
-          position: [
-            space.x + bestOrientation.width / 2,
-            space.y + bestOrientation.height / 2,
-            space.z + bestOrientation.depth / 2
-          ],
+          position: [itemX, itemY, itemZ],
           rotation: bestOrientation.rotation,
         };
         
@@ -238,7 +239,7 @@ const getPossibleOrientations = (item: Item) => {
 const splitSpace = (space: any, itemWidth: number, itemHeight: number, itemDepth: number) => {
   const newSpaces = [];
 
-  // Create right space
+  // Create right space (X axis)
   if (space.width > itemWidth) {
     newSpaces.push({
       x: space.x + itemWidth,
@@ -250,7 +251,7 @@ const splitSpace = (space: any, itemWidth: number, itemHeight: number, itemDepth
     });
   }
 
-  // Create top space
+  // Create top space (Y axis)
   if (space.height > itemHeight) {
     newSpaces.push({
       x: space.x,
@@ -262,7 +263,7 @@ const splitSpace = (space: any, itemWidth: number, itemHeight: number, itemDepth
     });
   }
 
-  // Create front space
+  // Create front space (Z axis)
   if (space.depth > itemDepth) {
     newSpaces.push({
       x: space.x,
