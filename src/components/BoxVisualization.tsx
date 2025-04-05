@@ -199,20 +199,24 @@ const BoxVisualization = ({
                   const scaledItemHeight = scaleDown(item.height);
                   const scaledItemDepth = scaleDown(item.depth);
                   
-                  // Updated position calculation to ensure items stay inside box
-                  // Bottom-left-back corner of the box is at (-width/2, -height/2, -depth/2)
-                  // Item position needs to be adjusted to stay inside these boundaries
+                  // Calculate position - critically important for proper placement
+                  // The origin (0,0,0) is the center of the box
+                  // We need to transform item coordinates to be relative to the center
+                  
                   const halfBoxWidth = scaledWidth / 2;
+                  const halfBoxHeight = scaledHeight / 2;
                   const halfBoxDepth = scaledDepth / 2;
                   
-                  // Adjust X position (left-right)
-                  const posX = (scaleDown(item.position[0]) - halfBoxWidth) + (scaledItemWidth / 2);
+                  // Transform from corner-origin to center-origin coordinate system
+                  // Start by scaling down the positions
+                  const scaledPosX = scaleDown(item.position[0]);
+                  const scaledPosY = scaleDown(item.position[1]);
+                  const scaledPosZ = scaleDown(item.position[2]);
                   
-                  // Adjust Y position (bottom-up)
-                  const posY = (scaleDown(item.position[1]) - scaledHeight) + (scaledItemHeight / 2);
-                  
-                  // Adjust Z position (back-front)
-                  const posZ = (scaleDown(item.position[2]) - halfBoxDepth) + (scaledItemDepth / 2);
+                  // Then shift so (0,0,0) is box center instead of corner
+                  const posX = scaledPosX - halfBoxWidth;
+                  const posY = scaledPosY - halfBoxHeight;
+                  const posZ = scaledPosZ - halfBoxDepth;
 
                   return (
                     <mesh

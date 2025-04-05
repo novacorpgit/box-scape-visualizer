@@ -28,7 +28,7 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
     return maxDimB - maxDimA;
   });
 
-  // Initialize space with the box
+  // Initialize space with the box - starting from (0,0,0) which is the bottom-left-back corner
   const spaces = [
     {
       x: 0,
@@ -76,11 +76,11 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
               space.z + orientation.depth <= boxDepth
             ) {
               // Calculate score for this placement (lower is better)
-              // Try to place items in the bottom, left, back corners first
+              // Prioritize bottom placement first, then left, then back
               const score = 
-                (space.y * 10) + // Prioritize lower Y positions (bottom)
-                (space.x * 1) +  // Then prioritize lower X positions (left)
-                (space.z * 1);   // Then prioritize lower Z positions (back)
+                (space.y * 100) + // Strongly prioritize lower Y positions (bottom)
+                (space.x * 10) +  // Then prioritize lower X positions (left)
+                (space.z * 1);    // Then prioritize lower Z positions (back)
 
               if (score < bestScore) {
                 bestScore = score;
@@ -96,7 +96,8 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
       if (bestSpace !== -1 && bestOrientation !== null) {
         const space = spaces[bestSpace];
         
-        // Calculate the position of the item (at the bottom of the space)
+        // Calculate the actual position of the item in the box
+        // These coordinates are from the center of the item
         const itemX = space.x + (bestOrientation.width / 2);
         const itemY = space.y + (bestOrientation.height / 2);
         const itemZ = space.z + (bestOrientation.depth / 2);
