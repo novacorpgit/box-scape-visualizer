@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Item } from "@/types";
 import { getRandomColor } from "@/utils/colorUtils";
 import { toast } from "sonner";
-import { Copy, Paste, Table as TableIcon } from "lucide-react";
+import { Copy, ClipboardPaste, Table as TableIcon } from "lucide-react";
 
 interface ItemsTableProps {
   onSubmit: (items: Item[]) => void;
@@ -156,7 +155,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
               onClick={() => toast.info("Paste data from Excel by clicking on a cell and pressing Ctrl+V")}
               title="Paste from Excel/Google Sheets"
             >
-              <Paste className="mr-2 h-4 w-4" />
+              <ClipboardPaste className="mr-2 h-4 w-4" />
               How to Paste
             </Button>
           </div>
