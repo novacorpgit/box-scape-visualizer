@@ -28,4 +28,5 @@ export interface PackingResult {
   unpackedItems: Item[];
   utilizationPercentage: number;
   packingInstructions: string[];
+  boxDimensions: BoxDimensions;
 }

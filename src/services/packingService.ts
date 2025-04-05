@@ -1,4 +1,3 @@
-
 import { BoxDimensions, Item, PackedItem, PackingResult } from "@/types";
 
 // Enhanced 3D bin packing algorithm
@@ -152,8 +151,101 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
     packedItems,
     unpackedItems,
     utilizationPercentage: Math.min(utilizationPercentage, 100),
-    packingInstructions
+    packingInstructions,
+    boxDimensions: box
   };
+};
+
+// New function to find the optimal box size
+export const findOptimalBoxSize = (items: Item[]): PackingResult => {
+  if (!items || items.length === 0) {
+    return {
+      success: false,
+      packedItems: [],
+      unpackedItems: [],
+      utilizationPercentage: 0,
+      packingInstructions: [],
+      boxDimensions: { width: 0, height: 0, depth: 0 }
+    };
+  }
+
+  // Make a copy of items for processing
+  const itemsToProcess = JSON.parse(JSON.stringify(items)) as Item[];
+  
+  // Calculate minimum box volume needed (sum of all item volumes with some buffer)
+  const totalItemVolume = itemsToProcess.reduce((total, item) => {
+    return total + (item.width * item.height * item.depth * item.quantity);
+  }, 0);
+  
+  // Buffer factor (adding 10% extra space)
+  const bufferFactor = 1.1;
+  const targetVolume = totalItemVolume * bufferFactor;
+  
+  // Find the maximum dimensions of any single item
+  let maxItemWidth = 0;
+  let maxItemHeight = 0;
+  let maxItemDepth = 0;
+  
+  itemsToProcess.forEach(item => {
+    const dimensions = [item.width, item.height, item.depth];
+    dimensions.sort((a, b) => b - a);
+    
+    maxItemWidth = Math.max(maxItemWidth, dimensions[0]);
+    maxItemHeight = Math.max(maxItemHeight, dimensions[1]);
+    maxItemDepth = Math.max(maxItemDepth, dimensions[2]);
+  });
+  
+  // Start with a cube that can hold the volume
+  const initialSize = Math.ceil(Math.pow(targetVolume, 1/3));
+  
+  // Ensure dimensions can fit the largest item
+  let optimizedBox: BoxDimensions = {
+    width: Math.max(initialSize, maxItemWidth),
+    height: Math.max(initialSize, maxItemHeight),
+    depth: Math.max(initialSize, maxItemDepth)
+  };
+  
+  // Binary search to find optimal dimensions
+  const iterations = 10; // Limit iterations to avoid infinite loops
+  let bestResult: PackingResult | null = null;
+  
+  for (let i = 0; i < iterations; i++) {
+    // Try current box size
+    const result = packItems(optimizedBox, itemsToProcess);
+    
+    // If all items fit, record this as a potential answer and try to reduce size
+    if (result.unpackedItems.length === 0) {
+      bestResult = result;
+      
+      // Try reducing dimensions by 5%
+      optimizedBox = {
+        width: Math.max(maxItemWidth, Math.floor(optimizedBox.width * 0.95)),
+        height: Math.max(maxItemHeight, Math.floor(optimizedBox.height * 0.95)),
+        depth: Math.max(maxItemDepth, Math.floor(optimizedBox.depth * 0.95))
+      };
+    } else {
+      // If items don't fit, increase dimensions by 10%
+      optimizedBox = {
+        width: Math.ceil(optimizedBox.width * 1.1),
+        height: Math.ceil(optimizedBox.height * 1.1),
+        depth: Math.ceil(optimizedBox.depth * 1.1)
+      };
+    }
+  }
+  
+  // If we found a solution, return it, otherwise try one more time with a larger box
+  if (bestResult && bestResult.unpackedItems.length === 0) {
+    return bestResult;
+  } else {
+    // One final attempt with a larger box
+    const finalBox: BoxDimensions = {
+      width: Math.ceil(optimizedBox.width * 1.2),
+      height: Math.ceil(optimizedBox.height * 1.2),
+      depth: Math.ceil(optimizedBox.depth * 1.2)
+    };
+    
+    return packItems(finalBox, itemsToProcess);
+  }
 };
 
 // Function to create human-readable rotation text

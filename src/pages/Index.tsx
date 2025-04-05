@@ -5,20 +5,24 @@ import ItemsForm from "@/components/ItemsForm";
 import ItemsTable from "@/components/ItemsTable";
 import BoxVisualization from "@/components/BoxVisualization";
 import { PackingResult, BoxDimensions, Item } from "@/types";
-import { packItems } from "@/services/packingService";
+import { packItems, findOptimalBoxSize } from "@/services/packingService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Grid2X2, List, Package, Info, AlertTriangle } from "lucide-react";
+import { Grid2X2, List, Package, Info, AlertTriangle, Maximize, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const Index = () => {
   const [boxDimensions, setBoxDimensions] = useState<BoxDimensions | null>(null);
   const [packingResult, setPackingResult] = useState<PackingResult | null>(null);
   const [inputMethod, setInputMethod] = useState<"form" | "table">("table");
+  const [currentItems, setCurrentItems] = useState<Item[]>([]);
+  const [isOptimized, setIsOptimized] = useState(false);
 
   const handleBoxDimensionsSubmit = (dimensions: BoxDimensions) => {
     setBoxDimensions(dimensions);
+    setIsOptimized(false);
     toast.success("Box dimensions set successfully!");
     
     // Clear any previous packing result when box dimensions change
@@ -28,13 +32,16 @@ const Index = () => {
   };
 
   const handleItemsSubmit = (items: Item[]) => {
-    if (!boxDimensions) {
+    setCurrentItems(items);
+    
+    if (!boxDimensions && !isOptimized) {
       toast.error("Please set box dimensions first");
       return;
     }
 
-    const result = packItems(boxDimensions, items);
+    const result = packItems(boxDimensions!, items);
     setPackingResult(result);
+    setIsOptimized(false);
 
     if (result.unpackedItems.length > 0) {
       toast.warning(`${result.unpackedItems.length} items couldn't be packed due to space constraints`);
@@ -42,10 +49,30 @@ const Index = () => {
       toast.success("All items packed successfully!");
     }
   };
+  
+  const handleOptimizeBoxSize = () => {
+    if (currentItems.length === 0) {
+      toast.error("Please add items first");
+      return;
+    }
+    
+    const optimizedResult = findOptimalBoxSize(currentItems);
+    setPackingResult(optimizedResult);
+    setBoxDimensions(optimizedResult.boxDimensions);
+    setIsOptimized(true);
+    
+    if (optimizedResult.unpackedItems.length > 0) {
+      toast.warning(`${optimizedResult.unpackedItems.length} items couldn't be packed even with optimized box`);
+    } else {
+      toast.success(`Optimized box size: ${optimizedResult.boxDimensions.width}×${optimizedResult.boxDimensions.height}×${optimizedResult.boxDimensions.depth} cm`);
+    }
+  };
 
   const resetAll = () => {
     setBoxDimensions(null);
     setPackingResult(null);
+    setCurrentItems([]);
+    setIsOptimized(false);
     toast.info("Reset all data");
   };
 
@@ -61,54 +88,80 @@ const Index = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-5 space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-800">Input Data</h2>
-              <Button variant="ghost" size="sm" onClick={resetAll}>
-                Reset All
-              </Button>
-            </div>
-            
-            <BoxDimensionsForm 
-              onSubmit={handleBoxDimensionsSubmit} 
-              initialDimensions={boxDimensions}
-            />
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-md font-medium text-gray-700">Items to Pack</h3>
-                <Tabs value={inputMethod} onValueChange={(value) => setInputMethod(value as "form" | "table")} className="w-auto">
-                  <TabsList>
-                    <TabsTrigger value="table">
-                      <Grid2X2 className="h-4 w-4 mr-2" />
-                      Table View
-                    </TabsTrigger>
-                    <TabsTrigger value="form">
-                      <List className="h-4 w-4 mr-2" />
-                      Form View
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-              
-              {inputMethod === "form" ? (
-                <ItemsForm 
-                  onSubmit={handleItemsSubmit} 
-                  isDisabled={!boxDimensions}
+            <Card className="overflow-hidden">
+              <CardHeader className="bg-muted/50 pb-2">
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-xl">Input Data</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={resetAll}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Reset All
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <BoxDimensionsForm 
+                  onSubmit={handleBoxDimensionsSubmit} 
+                  initialDimensions={boxDimensions}
                 />
-              ) : (
-                <ItemsTable
-                  onSubmit={handleItemsSubmit}
-                  isDisabled={!boxDimensions}
-                />
-              )}
-            </div>
+                
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-700">Items to Pack</h3>
+                    <Tabs value={inputMethod} onValueChange={(value) => setInputMethod(value as "form" | "table")} className="w-auto">
+                      <TabsList>
+                        <TabsTrigger value="table">
+                          <Grid2X2 className="h-4 w-4 mr-2" />
+                          Table View
+                        </TabsTrigger>
+                        <TabsTrigger value="form">
+                          <List className="h-4 w-4 mr-2" />
+                          Form View
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
+                  
+                  {inputMethod === "form" ? (
+                    <ItemsForm 
+                      onSubmit={handleItemsSubmit} 
+                      isDisabled={false}
+                    />
+                  ) : (
+                    <ItemsTable
+                      onSubmit={handleItemsSubmit}
+                      isDisabled={false}
+                    />
+                  )}
+                </div>
+
+                <div className="flex space-x-2 pt-4">
+                  <Button 
+                    className="flex-1" 
+                    disabled={currentItems.length === 0} 
+                    onClick={handleOptimizeBoxSize}
+                    variant="outline"
+                  >
+                    <Maximize className="h-4 w-4 mr-2" />
+                    Optimize Box Size
+                  </Button>
+                  <Button 
+                    className="flex-1" 
+                    disabled={!boxDimensions || currentItems.length === 0} 
+                    onClick={() => handleItemsSubmit(currentItems)}
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Calculate Packing
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="lg:col-span-7">
             <div className="h-[650px]">
               {packingResult ? (
                 <BoxVisualization 
-                  boxDimensions={boxDimensions!}
+                  boxDimensions={packingResult.boxDimensions}
                   packedItems={packingResult.packedItems}
                   utilizationPercentage={packingResult.utilizationPercentage}
                   packingInstructions={packingResult.packingInstructions}
@@ -126,8 +179,38 @@ const Index = () => {
               )}
             </div>
 
+            {isOptimized && packingResult && (
+              <Card className="mt-6 border-blue-200 bg-blue-50">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center">
+                    <Maximize className="h-5 w-5 text-blue-600 mr-2" />
+                    <CardTitle className="text-blue-700 text-lg">Optimized Box</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-2 text-sm">
+                    The optimal box size for your items:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="bg-white text-blue-700 border-blue-200">
+                      Width: {packingResult.boxDimensions.width} cm
+                    </Badge>
+                    <Badge variant="outline" className="bg-white text-blue-700 border-blue-200">
+                      Height: {packingResult.boxDimensions.height} cm
+                    </Badge>
+                    <Badge variant="outline" className="bg-white text-blue-700 border-blue-200">
+                      Depth: {packingResult.boxDimensions.depth} cm
+                    </Badge>
+                    <Badge variant="outline" className="bg-white text-blue-700 border-blue-200">
+                      Volume: {packingResult.boxDimensions.width * packingResult.boxDimensions.height * packingResult.boxDimensions.depth} cm³
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {packingResult && packingResult.unpackedItems.length > 0 && (
-              <Card className="mt-6 border-yellow-200 bg-yellow-50">
+              <Card className="mt-4 border-yellow-200 bg-yellow-50">
                 <CardHeader className="pb-2">
                   <div className="flex items-center">
                     <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2" />
