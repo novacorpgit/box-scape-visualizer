@@ -6,23 +6,28 @@ import { BoxDimensions, PackedItem } from "@/types";
 import html2canvas from "html2canvas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { Download, ZoomIn, ZoomOut, RotateCcw, ClipboardList, Check } from "lucide-react";
 import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface BoxVisualizationProps {
   boxDimensions: BoxDimensions;
   packedItems: PackedItem[];
   utilizationPercentage: number;
+  packingInstructions?: string[];
 }
 
 const BoxVisualization = ({
   boxDimensions,
   packedItems,
   utilizationPercentage,
+  packingInstructions = [],
 }: BoxVisualizationProps) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<any>(null);
   const [cameraPosition, setCameraPosition] = useState<[number, number, number]>([4, 4, 4]);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [instructionsCopied, setInstructionsCopied] = useState(false);
 
   const downloadImage = async () => {
     if (!canvasRef.current) return;
@@ -57,6 +62,26 @@ const BoxVisualization = ({
     setCameraPosition(prev => [prev[0] * 1.2, prev[1] * 1.2, prev[2] * 1.2]);
   };
 
+  const toggleInstructions = () => {
+    setShowInstructions(!showInstructions);
+  };
+
+  const copyInstructions = () => {
+    if (packingInstructions.length === 0) return;
+    
+    const text = packingInstructions.join('\n');
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        setInstructionsCopied(true);
+        toast.success("Instructions copied to clipboard");
+        setTimeout(() => setInstructionsCopied(false), 2000);
+      })
+      .catch(err => {
+        toast.error("Failed to copy instructions");
+        console.error("Error copying text: ", err);
+      });
+  };
+
   // Function to scale down dimensions for better visualization
   const scaleDown = (value: number) => value / 100;
 
@@ -71,6 +96,15 @@ const BoxVisualization = ({
         <div className="flex justify-between items-center">
           <CardTitle className="text-primary">3D Box Visualization</CardTitle>
           <div className="flex gap-2">
+            <Button 
+              onClick={toggleInstructions} 
+              variant={showInstructions ? "default" : "outline"} 
+              size="sm" 
+              title="Packing Instructions"
+            >
+              <ClipboardList className="h-4 w-4 mr-1" />
+              Instructions
+            </Button>
             <Button onClick={zoomOut} variant="outline" size="sm" title="Zoom out">
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -96,93 +130,125 @@ const BoxVisualization = ({
         </div>
       </CardHeader>
       <CardContent className="flex-grow relative p-0 overflow-hidden">
-        <div ref={canvasRef} className="w-full h-full min-h-[400px]">
-          <Canvas 
-            shadows
-            gl={{ preserveDrawingBuffer: true }}
-          >
-            <PerspectiveCamera 
-              makeDefault 
-              position={cameraPosition} 
-              fov={50}
-            />
-            <color attach="background" args={["#f8fafc"]} />
-            <ambientLight intensity={0.5} />
-            <directionalLight position={[5, 10, 5]} intensity={1} castShadow />
-            
-            {/* Center everything */}
-            <Center>
-              {/* Box container base (floor) */}
-              <mesh 
-                position={[0, -scaledHeight/2, 0]} 
-                receiveShadow
+        {showInstructions ? (
+          <div className="w-full h-full p-4 bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Packing Instructions</h3>
+              <Button 
+                onClick={copyInstructions} 
+                variant="outline" 
+                size="sm" 
+                disabled={packingInstructions.length === 0 || instructionsCopied}
               >
-                <boxGeometry args={[scaledWidth, 0.02, scaledDepth]} />
-                <meshStandardMaterial color="#a0aec0" roughness={0.8} />
-              </mesh>
-              
-              {/* Box container walls */}
-              <mesh position={[0, 0, 0]} receiveShadow>
-                <boxGeometry args={[scaledWidth, scaledHeight, scaledDepth]} />
-                <meshStandardMaterial wireframe={true} color="#475569" opacity={0.3} transparent />
-              </mesh>
-              
-              {/* Packed items */}
-              {packedItems.map((item) => {
-                const scaledItemWidth = scaleDown(item.width);
-                const scaledItemHeight = scaleDown(item.height);
-                const scaledItemDepth = scaleDown(item.depth);
-                
-                // Calculate item position - position is based from the bottom of the box
-                // This is the key change: adjusting item positions so they start from the box base
-                const posX = scaleDown(item.position[0]) - (scaledWidth / 2) + (scaledItemWidth / 2);
-                const posY = scaleDown(item.position[1]) - scaledHeight + (scaledItemHeight / 2);
-                const posZ = scaleDown(item.position[2]) - (scaledDepth / 2) + (scaledItemDepth / 2);
-
-                return (
-                  <mesh
-                    key={item.id}
-                    position={[posX, posY, posZ]}
-                    rotation={item.rotation.map(r => r * Math.PI / 180) as [number, number, number]}
-                    castShadow
-                    receiveShadow
-                  >
-                    <boxGeometry args={[scaledItemWidth, scaledItemHeight, scaledItemDepth]} />
-                    <meshStandardMaterial 
-                      color={item.color} 
-                      metalness={0.1}
-                      roughness={0.8}
-                    />
-                  </mesh>
-                );
-              })}
-            </Center>
-
-            <Grid
-              args={[10, 10]}
-              position={[0, -scaledHeight/2 - 0.01, 0]}
-              cellColor="#aaa"
-              sectionColor="#555"
-              fadeDistance={25}
-              fadeStrength={1.5}
-            />
+                {instructionsCopied ? (
+                  <Check className="h-4 w-4 mr-1 text-green-500" />
+                ) : (
+                  <ClipboardList className="h-4 w-4 mr-1" />
+                )}
+                {instructionsCopied ? "Copied!" : "Copy All"}
+              </Button>
+            </div>
             
-            <OrbitControls 
-              ref={controlsRef}
-              enableDamping 
-              dampingFactor={0.25} 
-              rotateSpeed={0.5}
-              minDistance={2}
-              maxDistance={15}
-              target={[0, 0, 0]}
-            />
-            <Environment preset="city" />
-          </Canvas>
-          
-          <div className="absolute bottom-2 left-2 text-xs text-muted-foreground bg-white/70 p-1 rounded">
-            Drag to rotate • Scroll to zoom • Double-click to reset view
+            {packingInstructions.length === 0 ? (
+              <p className="text-muted-foreground italic">No packing instructions available.</p>
+            ) : (
+              <ScrollArea className="h-[calc(100%-40px)]">
+                <ol className="space-y-2 list-decimal list-inside pl-2">
+                  {packingInstructions.map((instruction, index) => (
+                    <li key={index} className="text-sm">{instruction.substring(instruction.indexOf('.') + 1).trim()}</li>
+                  ))}
+                </ol>
+              </ScrollArea>
+            )}
           </div>
-        </div>
+        ) : (
+          <div ref={canvasRef} className="w-full h-full min-h-[400px]">
+            <Canvas 
+              shadows
+              gl={{ preserveDrawingBuffer: true }}
+            >
+              <PerspectiveCamera 
+                makeDefault 
+                position={cameraPosition} 
+                fov={50}
+              />
+              <color attach="background" args={["#f8fafc"]} />
+              <ambientLight intensity={0.5} />
+              <directionalLight position={[5, 10, 5]} intensity={1} castShadow />
+              
+              {/* Center everything */}
+              <Center>
+                {/* Box container base (floor) */}
+                <mesh 
+                  position={[0, -scaledHeight/2, 0]} 
+                  receiveShadow
+                >
+                  <boxGeometry args={[scaledWidth, 0.02, scaledDepth]} />
+                  <meshStandardMaterial color="#a0aec0" roughness={0.8} />
+                </mesh>
+                
+                {/* Box container walls */}
+                <mesh position={[0, 0, 0]} receiveShadow>
+                  <boxGeometry args={[scaledWidth, scaledHeight, scaledDepth]} />
+                  <meshStandardMaterial wireframe={true} color="#475569" opacity={0.3} transparent />
+                </mesh>
+                
+                {/* Packed items */}
+                {packedItems.map((item) => {
+                  const scaledItemWidth = scaleDown(item.width);
+                  const scaledItemHeight = scaleDown(item.height);
+                  const scaledItemDepth = scaleDown(item.depth);
+                  
+                  // Calculate item position - position is based from the bottom of the box
+                  const posX = scaleDown(item.position[0]) - (scaledWidth / 2) + (scaledItemWidth / 2);
+                  const posY = scaleDown(item.position[1]) - scaledHeight + (scaledItemHeight / 2);
+                  const posZ = scaleDown(item.position[2]) - (scaledDepth / 2) + (scaledItemDepth / 2);
+
+                  return (
+                    <mesh
+                      key={item.id}
+                      position={[posX, posY, posZ]}
+                      rotation={item.rotation.map(r => r * Math.PI / 180) as [number, number, number]}
+                      castShadow
+                      receiveShadow
+                    >
+                      <boxGeometry args={[scaledItemWidth, scaledItemHeight, scaledItemDepth]} />
+                      <meshStandardMaterial 
+                        color={item.color} 
+                        metalness={0.1}
+                        roughness={0.8}
+                      />
+                    </mesh>
+                  );
+                })}
+              </Center>
+
+              <Grid
+                args={[10, 10]}
+                position={[0, -scaledHeight/2 - 0.01, 0]}
+                cellColor="#aaa"
+                sectionColor="#555"
+                fadeDistance={25}
+                fadeStrength={1.5}
+              />
+              
+              <OrbitControls 
+                ref={controlsRef}
+                enableDamping 
+                dampingFactor={0.25} 
+                rotateSpeed={0.5}
+                minDistance={2}
+                maxDistance={15}
+                target={[0, 0, 0]}
+              />
+              <Environment preset="city" />
+            </Canvas>
+            
+            <div className="absolute bottom-2 left-2 text-xs text-muted-foreground bg-white/70 p-1 rounded">
+              Drag to rotate • Scroll to zoom • Double-click to reset view
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

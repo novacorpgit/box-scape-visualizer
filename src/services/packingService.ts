@@ -1,3 +1,4 @@
+
 import { BoxDimensions, Item, PackedItem, PackingResult } from "@/types";
 
 // Enhanced 3D bin packing algorithm
@@ -6,6 +7,7 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
   const itemsToProcess = JSON.parse(JSON.stringify(items)) as Item[];
   const packedItems: PackedItem[] = [];
   const unpackedItems: Item[] = [];
+  const packingInstructions: string[] = [];
 
   // Box dimensions
   const boxWidth = box.width;
@@ -39,6 +41,7 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
   ];
 
   let totalVolume = 0;
+  let itemCounter = 1;
 
   // Process each item
   for (const item of itemsToProcess) {
@@ -66,17 +69,24 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
             orientation.height <= space.height &&
             orientation.depth <= space.depth
           ) {
-            // Calculate score for this placement (lower is better)
-            // Try to minimize wasted space by placing items in corners
-            const score = 
-              (space.width - orientation.width) * 
-              (space.height - orientation.height) * 
-              (space.depth - orientation.depth);
+            // Additional check to ensure the item is fully within the box boundaries
+            if (
+              space.x + orientation.width <= boxWidth &&
+              space.y + orientation.height <= boxHeight &&
+              space.z + orientation.depth <= boxDepth
+            ) {
+              // Calculate score for this placement (lower is better)
+              // Try to minimize wasted space by placing items in corners
+              const score = 
+                (space.width - orientation.width) * 
+                (space.height - orientation.height) * 
+                (space.depth - orientation.depth);
 
-            if (score < bestScore) {
-              bestScore = score;
-              bestSpace = s;
-              bestOrientation = orientation;
+              if (score < bestScore) {
+                bestScore = score;
+                bestSpace = s;
+                bestOrientation = orientation;
+              }
             }
           }
         }
@@ -100,6 +110,12 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
           ],
           rotation: bestOrientation.rotation,
         };
+        
+        // Create packing instruction for this item
+        const rotationText = getRotationText(bestOrientation.rotation);
+        const instruction = `${itemCounter}. Place ${item.name} at position (${Math.round(space.x)}cm, ${Math.round(space.y)}cm, ${Math.round(space.z)}cm)${rotationText ? ` ${rotationText}` : ''}.`;
+        packingInstructions.push(instruction);
+        itemCounter++;
         
         packedItems.push(packedItem);
         totalVolume += itemVolume;
@@ -133,8 +149,23 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
     success: packedItems.length > 0,
     packedItems,
     unpackedItems,
-    utilizationPercentage: Math.min(utilizationPercentage, 100)
+    utilizationPercentage: Math.min(utilizationPercentage, 100),
+    packingInstructions
   };
+};
+
+// Function to create human-readable rotation text
+const getRotationText = (rotation: [number, number, number]): string => {
+  if (rotation[0] === 0 && rotation[1] === 0 && rotation[2] === 0) {
+    return '';
+  }
+  
+  const axes = [];
+  if (rotation[0] !== 0) axes.push(`${rotation[0]}° around X-axis`);
+  if (rotation[1] !== 0) axes.push(`${rotation[1]}° around Y-axis`);
+  if (rotation[2] !== 0) axes.push(`${rotation[2]}° around Z-axis`);
+  
+  return `rotated ${axes.join(' and ')}`;
 };
 
 // Get all possible orientations of an item based on its stackability

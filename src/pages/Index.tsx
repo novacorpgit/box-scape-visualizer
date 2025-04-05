@@ -111,6 +111,7 @@ const Index = () => {
                   boxDimensions={boxDimensions!}
                   packedItems={packingResult.packedItems}
                   utilizationPercentage={packingResult.utilizationPercentage}
+                  packingInstructions={packingResult.packingInstructions}
                 />
               ) : (
                 <Card className="h-full flex items-center justify-center">
