@@ -133,16 +133,16 @@ const BoxVisualization = ({
                 const scaledItemHeight = scaleDown(item.height);
                 const scaledItemDepth = scaleDown(item.depth);
                 
-                // Calculate item position relative to box center
-                // Adjust the Y position to start from the base of the box
-                const offsetX = (scaledWidth / 2) - scaleDown(item.position[0]) - (scaledItemWidth / 2);
-                const offsetY = (scaledHeight / 2) - scaleDown(item.position[1]) - (scaledItemHeight / 2);
-                const offsetZ = (scaledDepth / 2) - scaleDown(item.position[2]) - (scaledItemDepth / 2);
+                // Calculate item position - position is based from the bottom of the box
+                // This is the key change: adjusting item positions so they start from the box base
+                const posX = scaleDown(item.position[0]) - (scaledWidth / 2) + (scaledItemWidth / 2);
+                const posY = scaleDown(item.position[1]) - scaledHeight + (scaledItemHeight / 2);
+                const posZ = scaleDown(item.position[2]) - (scaledDepth / 2) + (scaledItemDepth / 2);
 
                 return (
                   <mesh
                     key={item.id}
-                    position={[-offsetX, -offsetY, -offsetZ]}
+                    position={[posX, posY, posZ]}
                     rotation={item.rotation.map(r => r * Math.PI / 180) as [number, number, number]}
                     castShadow
                     receiveShadow
