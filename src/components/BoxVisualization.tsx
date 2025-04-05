@@ -1,7 +1,7 @@
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, TransformControls, Center, Grid, Environment } from "@react-three/drei";
+import { OrbitControls, TransformControls, Center, Grid, Environment, PerspectiveCamera } from "@react-three/drei";
 import { BoxDimensions, PackedItem } from "@/types";
 import html2canvas from "html2canvas";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ const BoxVisualization = ({
 }: BoxVisualizationProps) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<any>(null);
+  const [cameraPosition, setCameraPosition] = useState<[number, number, number]>([4, 4, 4]);
 
   const downloadImage = async () => {
     if (!canvasRef.current) return;
@@ -43,8 +44,17 @@ const BoxVisualization = ({
   const resetCamera = () => {
     if (controlsRef.current) {
       controlsRef.current.reset();
+      setCameraPosition([4, 4, 4]);
       toast.success("Camera view reset");
     }
+  };
+
+  const zoomIn = () => {
+    setCameraPosition(prev => [prev[0] * 0.8, prev[1] * 0.8, prev[2] * 0.8]);
+  };
+
+  const zoomOut = () => {
+    setCameraPosition(prev => [prev[0] * 1.2, prev[1] * 1.2, prev[2] * 1.2]);
   };
 
   // Function to scale down dimensions for better visualization
@@ -61,6 +71,12 @@ const BoxVisualization = ({
         <div className="flex justify-between items-center">
           <CardTitle className="text-primary">3D Box Visualization</CardTitle>
           <div className="flex gap-2">
+            <Button onClick={zoomOut} variant="outline" size="sm" title="Zoom out">
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button onClick={zoomIn} variant="outline" size="sm" title="Zoom in">
+              <ZoomIn className="h-4 w-4" />
+            </Button>
             <Button onClick={resetCamera} variant="outline" size="sm" title="Reset view">
               <RotateCcw className="h-4 w-4" />
             </Button>
@@ -82,17 +98,30 @@ const BoxVisualization = ({
       <CardContent className="flex-grow relative p-0 overflow-hidden">
         <div ref={canvasRef} className="w-full h-full min-h-[400px]">
           <Canvas 
-            camera={{ position: [3, 3, 3], fov: 50 }}
             shadows
             gl={{ preserveDrawingBuffer: true }}
           >
+            <PerspectiveCamera 
+              makeDefault 
+              position={cameraPosition} 
+              fov={50}
+            />
             <color attach="background" args={["#f8fafc"]} />
             <ambientLight intensity={0.5} />
             <directionalLight position={[5, 10, 5]} intensity={1} castShadow />
             
             {/* Center everything */}
             <Center>
-              {/* Box container */}
+              {/* Box container base (floor) */}
+              <mesh 
+                position={[0, -scaledHeight/2, 0]} 
+                receiveShadow
+              >
+                <boxGeometry args={[scaledWidth, 0.02, scaledDepth]} />
+                <meshStandardMaterial color="#a0aec0" roughness={0.8} />
+              </mesh>
+              
+              {/* Box container walls */}
               <mesh position={[0, 0, 0]} receiveShadow>
                 <boxGeometry args={[scaledWidth, scaledHeight, scaledDepth]} />
                 <meshStandardMaterial wireframe={true} color="#475569" opacity={0.3} transparent />
@@ -105,6 +134,7 @@ const BoxVisualization = ({
                 const scaledItemDepth = scaleDown(item.depth);
                 
                 // Calculate item position relative to box center
+                // Adjust the Y position to start from the base of the box
                 const offsetX = (scaledWidth / 2) - scaleDown(item.position[0]) - (scaledItemWidth / 2);
                 const offsetY = (scaledHeight / 2) - scaleDown(item.position[1]) - (scaledItemHeight / 2);
                 const offsetZ = (scaledDepth / 2) - scaleDown(item.position[2]) - (scaledItemDepth / 2);
@@ -142,14 +172,15 @@ const BoxVisualization = ({
               enableDamping 
               dampingFactor={0.25} 
               rotateSpeed={0.5}
-              minDistance={1}
-              maxDistance={10}
+              minDistance={2}
+              maxDistance={15}
+              target={[0, 0, 0]}
             />
             <Environment preset="city" />
           </Canvas>
           
           <div className="absolute bottom-2 left-2 text-xs text-muted-foreground bg-white/70 p-1 rounded">
-            Drag to rotate • Scroll to zoom
+            Drag to rotate • Scroll to zoom • Double-click to reset view
           </div>
         </div>
       </CardContent>
