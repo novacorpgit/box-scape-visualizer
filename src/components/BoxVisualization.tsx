@@ -69,7 +69,7 @@ const BoxVisualization = ({
       const steps: { image: string; itemId: string }[] = [];
 
       // Save current camera position
-      const originalCameraPos = [...cameraPosition];
+      const originalCameraPos = [...cameraPosition] as [number, number, number];
       
       // Set a good camera angle for step images
       setCameraPosition([5, 5, 5]);
