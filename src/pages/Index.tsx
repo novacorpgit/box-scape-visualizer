@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import BoxDimensionsForm from "@/components/BoxDimensionsForm";
 import ItemsForm from "@/components/ItemsForm";
@@ -9,7 +8,7 @@ import { packItems, findOptimalBoxSize } from "@/services/packingService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Grid2X2, List, Package, Info, AlertTriangle, Maximize, RefreshCw, Box, Boxes, Cube } from "lucide-react";
+import { Grid2X2, List, Package, Info, AlertTriangle, Maximize, RefreshCw, Box, Boxes, PackageCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -26,12 +25,10 @@ const Index = () => {
     setIsOptimized(false);
     toast.success("Box dimensions set successfully!");
     
-    // Clear any previous packing result when box dimensions change
     if (packingResult) {
       setPackingResult(null);
     }
     
-    // Move to the items tab after setting dimensions
     setActiveTab("items");
   };
 
@@ -54,7 +51,6 @@ const Index = () => {
       toast.success("All items packed successfully!");
     }
     
-    // Switch to visualization tab
     setActiveTab("visualization");
   };
   
@@ -76,7 +72,6 @@ const Index = () => {
       toast.success(`Optimized box size: ${optimizedResult.boxDimensions.width}×${optimizedResult.boxDimensions.height}×${optimizedResult.boxDimensions.depth} cm`);
     }
     
-    // Switch to visualization tab
     setActiveTab("visualization");
   };
 
@@ -117,7 +112,7 @@ const Index = () => {
               Items to Pack
             </TabsTrigger>
             <TabsTrigger value="visualization" className="flex items-center gap-2">
-              <Cube className="h-4 w-4" />
+              <PackageCheck className="h-4 w-4" />
               3D Visualization
             </TabsTrigger>
           </TabsList>
