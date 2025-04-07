@@ -18,7 +18,7 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
   // Enhanced sorting strategy: Sort items by volume (largest first) with secondary criteria
   itemsToProcess.sort((a, b) => {
     const volumeA = a.width * a.height * a.depth;
-    const volumeB = b.width * a.height * b.depth;
+    const volumeB = b.width * b.height * b.depth;
     
     // Primary sort by volume
     if (volumeB !== volumeA) {
@@ -80,25 +80,40 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
             orientation.height <= space.height &&
             orientation.depth <= space.depth
           ) {
-            // Additional check to ensure the item is fully within the box boundaries
+            // IMPROVED BOUNDARY CHECK: Ensure the item is fully within the box boundaries
+            // This prevents items from extending outside the box
             if (
               space.x + orientation.width <= boxWidth &&
               space.y + orientation.height <= boxHeight &&
               space.z + orientation.depth <= boxDepth
             ) {
-              // Enhanced scoring system to minimize gaps
-              // Lower score means better placement
-              const score = calculatePlacementScore(space, orientation, boxWidth, boxHeight, boxDepth, packedItems);
-                
-              if (score < bestScore) {
-                bestScore = score;
-                bestSpace = s;
-                bestOrientation = orientation;
-                bestPosition = {
-                  x: space.x,
-                  y: space.y,
-                  z: space.z
-                };
+              // Check for collisions with already packed items
+              const wouldCollide = checkCollision(
+                space.x, 
+                space.y, 
+                space.z, 
+                orientation.width, 
+                orientation.height, 
+                orientation.depth, 
+                packedItems
+              );
+              
+              // Only consider this position if there's no collision
+              if (!wouldCollide) {
+                // Enhanced scoring system to minimize gaps
+                // Lower score means better placement
+                const score = calculatePlacementScore(space, orientation, boxWidth, boxHeight, boxDepth, packedItems);
+                  
+                if (score < bestScore) {
+                  bestScore = score;
+                  bestSpace = s;
+                  bestOrientation = orientation;
+                  bestPosition = {
+                    x: space.x,
+                    y: space.y,
+                    z: space.z
+                  };
+                }
               }
             }
           }
@@ -126,32 +141,46 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
           rotation: bestOrientation.rotation,
         };
         
-        // Create packing instruction for this item
-        const rotationText = getRotationText(bestOrientation.rotation);
-        const instruction = `${itemCounter}. Place ${item.name} at position (${Math.round(bestPosition.x)}cm, ${Math.round(bestPosition.y)}cm, ${Math.round(bestPosition.z)}cm)${rotationText ? ` ${rotationText}` : ''}.`;
-        packingInstructions.push(instruction);
-        itemCounter++;
-        
-        packedItems.push(packedItem);
-        totalVolume += itemVolume;
-        packed = true;
-
-        // Use the improved space splitting algorithm
-        const newSpaces = splitSpaceExhaustive(
-          space,
-          bestPosition.x,
-          bestPosition.y,
-          bestPosition.z,
-          bestOrientation.width,
-          bestOrientation.height,
-          bestOrientation.depth
+        // Perform a final collision check before adding the item
+        const hasCollision = checkCollision(
+          bestPosition.x, 
+          bestPosition.y, 
+          bestPosition.z, 
+          bestOrientation.width, 
+          bestOrientation.height, 
+          bestOrientation.depth, 
+          packedItems
         );
         
-        // Remove the used space and add the new spaces
-        spaces.splice(bestSpace, 1, ...newSpaces);
-        
-        // Enhanced space management - more aggressive cleanup
-        cleanupSpacesComplete(spaces);
+        // Only add the item if there's no collision
+        if (!hasCollision) {
+          // Create packing instruction for this item
+          const rotationText = getRotationText(bestOrientation.rotation);
+          const instruction = `${itemCounter}. Place ${item.name} at position (${Math.round(bestPosition.x)}cm, ${Math.round(bestPosition.y)}cm, ${Math.round(bestPosition.z)}cm)${rotationText ? ` ${rotationText}` : ''}.`;
+          packingInstructions.push(instruction);
+          itemCounter++;
+          
+          packedItems.push(packedItem);
+          totalVolume += itemVolume;
+          packed = true;
+
+          // Use the improved space splitting algorithm
+          const newSpaces = splitSpaceExhaustive(
+            space,
+            bestPosition.x,
+            bestPosition.y,
+            bestPosition.z,
+            bestOrientation.width,
+            bestOrientation.height,
+            bestOrientation.depth
+          );
+          
+          // Remove the used space and add the new spaces
+          spaces.splice(bestSpace, 1, ...newSpaces);
+          
+          // Enhanced space management - more aggressive cleanup
+          cleanupSpacesComplete(spaces);
+        }
       }
 
       // If we couldn't pack this item
@@ -171,6 +200,52 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
     packingInstructions,
     boxDimensions: box
   };
+};
+
+// NEW FUNCTION: Check for collisions between items
+// Returns true if there is a collision
+const checkCollision = (
+  x: number, 
+  y: number, 
+  z: number, 
+  width: number, 
+  height: number, 
+  depth: number, 
+  packedItems: PackedItem[]
+): boolean => {
+  // Calculate bounds of the new item
+  const x1 = x;
+  const x2 = x + width;
+  const y1 = y;
+  const y2 = y + height;
+  const z1 = z;
+  const z2 = z + depth;
+  
+  // Check collision with each packed item
+  for (const item of packedItems) {
+    // Calculate bounds of the packed item
+    // Adjust the position (which is the center) to get the corner
+    const itemX1 = item.position[0] - item.width / 2;
+    const itemX2 = item.position[0] + item.width / 2;
+    const itemY1 = item.position[1] - item.height / 2;
+    const itemY2 = item.position[1] + item.height / 2;
+    const itemZ1 = item.position[2] - item.depth / 2;
+    const itemZ2 = item.position[2] + item.depth / 2;
+    
+    // Check for overlap in all dimensions
+    // Add a small buffer (0.1) to avoid floating point precision issues
+    if (
+      x1 < itemX2 + 0.1 && x2 > itemX1 - 0.1 &&
+      y1 < itemY2 + 0.1 && y2 > itemY1 - 0.1 &&
+      z1 < itemZ2 + 0.1 && z2 > itemZ1 - 0.1
+    ) {
+      // Collision detected
+      return true;
+    }
+  }
+  
+  // No collision found
+  return false;
 };
 
 // Calculate score for a placement - lower is better
@@ -301,7 +376,58 @@ const calculatePlacementScore = (
   score += space.y * 200; // Large penalty for height
   score += (space.x + space.z) * 20; // Smaller penalty for horizontal distance
   
+  // COMPONENT 6: NEW - Prefer positions that won't cause future overlaps
+  // This helps avoid creating small unusable spaces
+  const wastedSpaceRisk = estimateWastedSpaceRisk(
+    space.x, space.y, space.z,
+    orientation.width, orientation.height, orientation.depth,
+    boxWidth, boxHeight, boxDepth
+  );
+  score += wastedSpaceRisk * 300;
+  
   return score;
+};
+
+// NEW FUNCTION: Estimate risk of creating wasted spaces
+const estimateWastedSpaceRisk = (
+  x: number, y: number, z: number,
+  width: number, height: number, depth: number,
+  boxWidth: number, boxHeight: number, boxDepth: number
+): number => {
+  let risk = 0;
+  
+  // If placement creates a narrow gap against a wall, penalize it
+  // X direction gaps
+  if (x > 0 && x < 10) {
+    // Small gap between item and left wall
+    risk += (10 - x) * 2;
+  }
+  if (x + width < boxWidth && boxWidth - (x + width) < 10) {
+    // Small gap between item and right wall
+    risk += (10 - (boxWidth - (x + width))) * 2;
+  }
+  
+  // Y direction gaps (vertical)
+  if (y > 0 && y < 10) {
+    // Small gap above the floor
+    risk += (10 - y) * 3; // Higher penalty for vertical gaps
+  }
+  if (y + height < boxHeight && boxHeight - (y + height) < 10) {
+    // Small gap below ceiling
+    risk += (10 - (boxHeight - (y + height))) * 2;
+  }
+  
+  // Z direction gaps
+  if (z > 0 && z < 10) {
+    // Small gap between item and back wall
+    risk += (10 - z) * 2;
+  }
+  if (z + depth < boxDepth && boxDepth - (z + depth) < 10) {
+    // Small gap between item and front wall
+    risk += (10 - (boxDepth - (z + depth))) * 2;
+  }
+  
+  return risk;
 };
 
 // Check if two ranges overlap

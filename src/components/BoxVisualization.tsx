@@ -487,6 +487,7 @@ const BoxVisualization = ({
               <directionalLight position={[5, 10, 5]} intensity={1} castShadow />
               
               <Center>
+                {/* Box floor */}
                 <mesh 
                   position={[0, -scaledHeight/2, 0]} 
                   receiveShadow
@@ -495,11 +496,13 @@ const BoxVisualization = ({
                   <meshStandardMaterial color="#a0aec0" roughness={0.8} />
                 </mesh>
                 
+                {/* Box wireframe */}
                 <mesh position={[0, 0, 0]} receiveShadow>
                   <boxGeometry args={[scaledWidth, scaledHeight, scaledDepth]} />
                   <meshStandardMaterial wireframe={true} color="#475569" opacity={0.3} transparent />
                 </mesh>
                 
+                {/* Render items inside the box */}
                 {packedItems.map((item, index) => {
                   if (showingStep !== null && index > showingStep) {
                     return null;
@@ -509,14 +512,19 @@ const BoxVisualization = ({
                   const scaledItemHeight = scaleDown(item.height);
                   const scaledItemDepth = scaleDown(item.depth);
                   
+                  // Calculate position from center of box to item center
+                  // Box center is at [0,0,0], so we need to adjust item position
+                  // relative to box center
                   const halfBoxWidth = scaledWidth / 2;
                   const halfBoxHeight = scaledHeight / 2;
                   const halfBoxDepth = scaledDepth / 2;
                   
+                  // Convert item position to scaled values
                   const scaledPosX = scaleDown(item.position[0]);
                   const scaledPosY = scaleDown(item.position[1]);
                   const scaledPosZ = scaleDown(item.position[2]);
                   
+                  // Calculate position relative to box center
                   const posX = scaledPosX - halfBoxWidth;
                   const posY = scaledPosY - halfBoxHeight;
                   const posZ = scaledPosZ - halfBoxDepth;
