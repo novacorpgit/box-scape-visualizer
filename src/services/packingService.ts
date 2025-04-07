@@ -951,14 +951,15 @@ export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): 
     initialHeight = initialWidth * targetRatio;
   }
   
-  const boxDimensions: BoxDimensions = {
+  // Create a mutable box dimensions object that we can update
+  let currentBoxDimensions: BoxDimensions = {
     width: Math.ceil(initialWidth),
     height: Math.ceil(initialHeight),
     depth: Math.ceil(initialDepth)
   };
   
   // Try packing items into the initial box
-  let packingResult = packItems(boxDimensions, itemsToProcess);
+  let packingResult = packItems(currentBoxDimensions, itemsToProcess);
   
   // Keep increasing box size until all items fit
   let attempts = 0;
@@ -969,14 +970,13 @@ export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): 
     
     // Increase box dimensions by 10% each iteration
     const growthFactor = 1.1;
-    const largerBox = {
-      width: Math.ceil(boxDimensions.width * growthFactor),
-      height: Math.ceil(boxDimensions.height * growthFactor),
-      depth: Math.ceil(boxDimensions.depth * growthFactor)
+    currentBoxDimensions = {
+      width: Math.ceil(currentBoxDimensions.width * growthFactor),
+      height: Math.ceil(currentBoxDimensions.height * growthFactor),
+      depth: Math.ceil(currentBoxDimensions.depth * growthFactor)
     };
     
-    boxDimensions = largerBox;
-    packingResult = packItems(boxDimensions, itemsToProcess);
+    packingResult = packItems(currentBoxDimensions, itemsToProcess);
   }
   
   // If we still have unpacked items after multiple attempts, try a different approach
