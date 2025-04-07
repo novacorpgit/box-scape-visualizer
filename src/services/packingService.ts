@@ -1,3 +1,4 @@
+
 import { BoxDimensions, Item, PackedItem, PackingResult } from "@/types";
 
 // Enhanced 3D bin packing algorithm with improved space utilization
@@ -808,4 +809,97 @@ export const findOptimalBoxSize = (items: Item[]): PackingResult => {
       maxItemDepth = Math.max(maxItemDepth, item.width, item.height, item.depth);
     } else {
       // If the item can't be rotated, respect its orientation
-      maxItemWidth = Math.max(maxItemWidth,
+      maxItemWidth = Math.max(maxItemWidth, item.width);
+      maxItemHeight = Math.max(maxItemHeight, item.height);
+      maxItemDepth = Math.max(maxItemDepth, item.depth);
+    }
+  });
+  
+  // Initial guess for box dimensions with buffer factor
+  const bufferFactor = 1.15; // 15% buffer
+  
+  // Start with a simple cuboid approach - using cubic root to approximate dimensions
+  const cubeRoot = Math.cbrt(totalItemVolume * bufferFactor);
+  
+  // Create an initial box slightly larger than the cube root estimate,
+  // but respecting the maximum item dimensions
+  let initialWidth = Math.max(cubeRoot, maxItemWidth);
+  let initialHeight = Math.max(cubeRoot, maxItemHeight);
+  let initialDepth = Math.max(cubeRoot, maxItemDepth);
+  
+  // Adjust the box to be more suitable for shipping (not too tall, wider base)
+  // Prefer height to be the smallest dimension if possible
+  const targetRatio = 0.7; // height:width ratio target for stability
+  
+  if (initialHeight > initialWidth * targetRatio && maxItemHeight <= initialWidth * targetRatio) {
+    // If box is too tall and we can make it shorter, do so
+    const excessHeight = initialHeight - (initialWidth * targetRatio);
+    initialDepth += excessHeight * 0.7;
+    initialWidth += excessHeight * 0.3;
+    initialHeight = initialWidth * targetRatio;
+  }
+  
+  const boxDimensions: BoxDimensions = {
+    width: Math.ceil(initialWidth),
+    height: Math.ceil(initialHeight),
+    depth: Math.ceil(initialDepth)
+  };
+  
+  // Try packing items into the initial box
+  let packingResult = packItems(boxDimensions, itemsToProcess);
+  
+  // If we have unpacked items, try different box configurations
+  if (packingResult.unpackedItems.length > 0) {
+    // Optimization approach: try multiple box configurations
+    const configurations = [];
+    
+    // Collection of possible box configurations to try
+    configurations.push({ width: Math.ceil(initialWidth * 1.1), height: Math.ceil(initialHeight), depth: Math.ceil(initialDepth) });
+    configurations.push({ width: Math.ceil(initialWidth), height: Math.ceil(initialHeight * 1.1), depth: Math.ceil(initialDepth) });
+    configurations.push({ width: Math.ceil(initialWidth), height: Math.ceil(initialHeight), depth: Math.ceil(initialDepth * 1.1) });
+    configurations.push({ width: Math.ceil(initialWidth * 1.05), height: Math.ceil(initialHeight * 1.05), depth: Math.ceil(initialDepth) });
+    configurations.push({ width: Math.ceil(initialWidth * 1.05), height: Math.ceil(initialHeight), depth: Math.ceil(initialDepth * 1.05) });
+    configurations.push({ width: Math.ceil(initialWidth), height: Math.ceil(initialHeight * 1.05), depth: Math.ceil(initialDepth * 1.05) });
+    configurations.push({ width: Math.ceil(initialWidth * 1.1), height: Math.ceil(initialHeight * 1.1), depth: Math.ceil(initialDepth * 1.1) });
+    
+    // For items that couldn't be packed, try a slightly larger box with each configuration
+    let bestResult = packingResult;
+    
+    for (const config of configurations) {
+      const result = packItems(config, itemsToProcess);
+      
+      // Evaluate if this configuration is better than the current best
+      if (result.unpackedItems.length < bestResult.unpackedItems.length ||
+         (result.unpackedItems.length === bestResult.unpackedItems.length && 
+          result.utilizationPercentage > bestResult.utilizationPercentage)) {
+        bestResult = result;
+      }
+      
+      // If we've packed all items, no need to try more configurations
+      if (result.unpackedItems.length === 0) {
+        break;
+      }
+    }
+    
+    // Use the best configuration we found
+    packingResult = bestResult;
+    
+    // If we still have unpacked items, try one final approach with 20% larger dimensions
+    if (packingResult.unpackedItems.length > 0) {
+      const largerBox = {
+        width: Math.ceil(initialWidth * 1.2),
+        height: Math.ceil(initialHeight * 1.2),
+        depth: Math.ceil(initialDepth * 1.2)
+      };
+      
+      const finalResult = packItems(largerBox, itemsToProcess);
+      
+      // Only use this result if it packs more items
+      if (finalResult.unpackedItems.length < packingResult.unpackedItems.length) {
+        packingResult = finalResult;
+      }
+    }
+  }
+  
+  return packingResult;
+};
