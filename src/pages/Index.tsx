@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import BoxDimensionsForm from "@/components/BoxDimensionsForm";
 import ItemsForm from "@/components/ItemsForm";
@@ -61,7 +62,8 @@ const Index = () => {
       return;
     }
     
-    const optimizedResult = findOptimalBoxSize(currentItems);
+    // Use a more aggressive optimization algorithm
+    const optimizedResult = findOptimalBoxSize(currentItems, true); // Adding 'true' parameter to indicate aggressive optimization
     setPackingResult(optimizedResult);
     setBoxDimensions(optimizedResult.boxDimensions);
     setIsOptimized(true);
@@ -168,11 +170,13 @@ const Index = () => {
                 <ItemsForm 
                   onSubmit={handleItemsSubmit} 
                   isDisabled={false}
+                  initialItems={currentItems.length > 0 ? currentItems : undefined}
                 />
               ) : (
                 <ItemsTable
                   onSubmit={handleItemsSubmit}
                   isDisabled={false}
+                  initialItems={currentItems.length > 0 ? currentItems : undefined}
                 />
               )}
             </div>

@@ -1,5 +1,4 @@
-
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +13,10 @@ import { Label } from "@/components/ui/label";
 interface ItemsTableProps {
   onSubmit: (items: Item[]) => void;
   isDisabled: boolean;
+  initialItems?: Item[];
 }
 
-const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
+const ItemsTable = ({ onSubmit, isDisabled, initialItems }: ItemsTableProps) => {
   const [items, setItems] = useState<Item[]>([
     {
       id: "1",
@@ -26,11 +26,17 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
       depth: 20,
       quantity: 1,
       weight: 1,
-      maxStack: true, // Default to allow stacking
+      maxStack: true,
       color: getRandomColor(),
-      allowRotation: true, // Default to allow rotation
+      allowRotation: true,
     },
   ]);
+
+  useEffect(() => {
+    if (initialItems && initialItems.length > 0) {
+      setItems(initialItems);
+    }
+  }, [initialItems]);
 
   const tableRef = useRef<HTMLTableElement>(null);
 
@@ -43,9 +49,9 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
       depth: 20,
       quantity: 1,
       weight: 1,
-      maxStack: true, // Default to allow stacking
+      maxStack: true,
       color: getRandomColor(),
-      allowRotation: true, // Default to allow rotation
+      allowRotation: true,
     };
     setItems([...items, newItem]);
   };
@@ -81,29 +87,23 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     e.preventDefault();
     
-    // Get clipboard data
     const clipboardData = e.clipboardData;
     if (!clipboardData) return;
     
     const text = clipboardData.getData('text');
     if (!text) return;
     
-    // Split the clipboard text by rows and columns
     const rows = text.split(/\r\n|\r|\n/).filter(row => row.trim() !== '');
     
     if (rows.length === 0) return;
     
-    // Check if we have a header row - simple heuristic, if first cell is non-numeric, it might be a header
     const startIndex = isNaN(Number(rows[0].split('\t')[0])) ? 1 : 0;
     
-    // Map the pasted data to new items
     let newItems: Item[] = [];
     
     for (let i = startIndex; i < rows.length; i++) {
       const columns = rows[i].split('\t');
       
-      // Expect that columns are in this order: Name, Width, Height, Depth, Quantity, Weight, MaxStack, AllowRotation
-      // Fill in as many columns as available
       if (columns.length >= 3) {
         const item: Item = {
           id: String(newItems.length + 1),
