@@ -9,7 +9,7 @@ import { packItems, findOptimalBoxSize } from "@/services/packingService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Grid2X2, List, Package, Info, AlertTriangle, Maximize, RefreshCw } from "lucide-react";
+import { Grid2X2, List, Package, Info, AlertTriangle, Maximize, RefreshCw, Box, Boxes, Cube } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -19,6 +19,7 @@ const Index = () => {
   const [inputMethod, setInputMethod] = useState<"form" | "table">("table");
   const [currentItems, setCurrentItems] = useState<Item[]>([]);
   const [isOptimized, setIsOptimized] = useState(false);
+  const [activeTab, setActiveTab] = useState("dimensions");
 
   const handleBoxDimensionsSubmit = (dimensions: BoxDimensions) => {
     setBoxDimensions(dimensions);
@@ -29,6 +30,9 @@ const Index = () => {
     if (packingResult) {
       setPackingResult(null);
     }
+    
+    // Move to the items tab after setting dimensions
+    setActiveTab("items");
   };
 
   const handleItemsSubmit = (items: Item[]) => {
@@ -36,6 +40,7 @@ const Index = () => {
     
     if (!boxDimensions && !isOptimized) {
       toast.error("Please set box dimensions first");
+      setActiveTab("dimensions");
       return;
     }
 
@@ -48,11 +53,15 @@ const Index = () => {
     } else {
       toast.success("All items packed successfully!");
     }
+    
+    // Switch to visualization tab
+    setActiveTab("visualization");
   };
   
   const handleOptimizeBoxSize = () => {
     if (currentItems.length === 0) {
       toast.error("Please add items first");
+      setActiveTab("items");
       return;
     }
     
@@ -66,6 +75,9 @@ const Index = () => {
     } else {
       toast.success(`Optimized box size: ${optimizedResult.boxDimensions.width}×${optimizedResult.boxDimensions.height}×${optimizedResult.boxDimensions.depth} cm`);
     }
+    
+    // Switch to visualization tab
+    setActiveTab("visualization");
   };
 
   const resetAll = () => {
@@ -73,6 +85,7 @@ const Index = () => {
     setPackingResult(null);
     setCurrentItems([]);
     setIsOptimized(false);
+    setActiveTab("dimensions");
     toast.info("Reset all data");
   };
 
@@ -86,78 +99,104 @@ const Index = () => {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-5 space-y-6">
-            <Card className="overflow-hidden">
-              <CardHeader className="bg-muted/50 pb-2">
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-xl">Input Data</CardTitle>
-                  <Button variant="ghost" size="sm" onClick={resetAll}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Reset All
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-6">
-                <BoxDimensionsForm 
-                  onSubmit={handleBoxDimensionsSubmit} 
-                  initialDimensions={boxDimensions}
+        <div className="flex justify-end mb-4">
+          <Button variant="outline" size="sm" onClick={resetAll} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Reset All
+          </Button>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="dimensions" className="flex items-center gap-2">
+              <Box className="h-4 w-4" />
+              Box Dimensions
+            </TabsTrigger>
+            <TabsTrigger value="items" className="flex items-center gap-2">
+              <Boxes className="h-4 w-4" />
+              Items to Pack
+            </TabsTrigger>
+            <TabsTrigger value="visualization" className="flex items-center gap-2">
+              <Cube className="h-4 w-4" />
+              3D Visualization
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="dimensions" className="space-y-4">
+            <BoxDimensionsForm 
+              onSubmit={handleBoxDimensionsSubmit} 
+              initialDimensions={boxDimensions}
+            />
+            
+            {boxDimensions && (
+              <div className="flex justify-end mt-4">
+                <Button onClick={() => setActiveTab("items")}>
+                  Continue to Items
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="items" className="space-y-4">
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-700">Items to Pack</h3>
+                <Tabs value={inputMethod} onValueChange={(value) => setInputMethod(value as "form" | "table")} className="w-auto">
+                  <TabsList>
+                    <TabsTrigger value="table">
+                      <Grid2X2 className="h-4 w-4 mr-2" />
+                      Table View
+                    </TabsTrigger>
+                    <TabsTrigger value="form">
+                      <List className="h-4 w-4 mr-2" />
+                      Form View
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+              
+              {inputMethod === "form" ? (
+                <ItemsForm 
+                  onSubmit={handleItemsSubmit} 
+                  isDisabled={false}
                 />
-                
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-gray-700">Items to Pack</h3>
-                    <Tabs value={inputMethod} onValueChange={(value) => setInputMethod(value as "form" | "table")} className="w-auto">
-                      <TabsList>
-                        <TabsTrigger value="table">
-                          <Grid2X2 className="h-4 w-4 mr-2" />
-                          Table View
-                        </TabsTrigger>
-                        <TabsTrigger value="form">
-                          <List className="h-4 w-4 mr-2" />
-                          Form View
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  </div>
-                  
-                  {inputMethod === "form" ? (
-                    <ItemsForm 
-                      onSubmit={handleItemsSubmit} 
-                      isDisabled={false}
-                    />
-                  ) : (
-                    <ItemsTable
-                      onSubmit={handleItemsSubmit}
-                      isDisabled={false}
-                    />
-                  )}
-                </div>
+              ) : (
+                <ItemsTable
+                  onSubmit={handleItemsSubmit}
+                  isDisabled={false}
+                />
+              )}
+            </div>
 
-                <div className="flex space-x-2 pt-4">
-                  <Button 
-                    className="flex-1" 
-                    disabled={currentItems.length === 0} 
-                    onClick={handleOptimizeBoxSize}
-                    variant="outline"
-                  >
-                    <Maximize className="h-4 w-4 mr-2" />
-                    Optimize Box Size
-                  </Button>
-                  <Button 
-                    className="flex-1" 
-                    disabled={!boxDimensions || currentItems.length === 0} 
-                    onClick={() => handleItemsSubmit(currentItems)}
-                  >
-                    <Package className="h-4 w-4 mr-2" />
-                    Calculate Packing
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="lg:col-span-7">
+            <div className="flex justify-between gap-4 mt-4">
+              <Button 
+                onClick={() => setActiveTab("dimensions")}
+                variant="outline"
+              >
+                Back to Dimensions
+              </Button>
+              
+              <div className="flex gap-2">
+                <Button 
+                  disabled={currentItems.length === 0} 
+                  onClick={handleOptimizeBoxSize}
+                  variant="outline"
+                >
+                  <Maximize className="h-4 w-4 mr-2" />
+                  Optimize Box Size
+                </Button>
+                <Button 
+                  disabled={!boxDimensions || currentItems.length === 0} 
+                  onClick={() => handleItemsSubmit(currentItems)}
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Calculate Packing
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="visualization" className="space-y-4">
             <div className="h-[650px]">
               {packingResult ? (
                 <BoxVisualization 
@@ -169,7 +208,7 @@ const Index = () => {
               ) : (
                 <Card className="h-full flex items-center justify-center">
                   <CardContent className="text-center py-20">
-                    <Package className="h-16 w-16 text-muted-foreground/50 mx-auto mb-6" />
+                    <Cube className="h-16 w-16 text-muted-foreground/50 mx-auto mb-6" />
                     <h3 className="text-xl font-medium mb-2">3D Visualization</h3>
                     <p className="text-muted-foreground max-w-md">
                       Enter box dimensions and items to see your packing layout visualized in 3D
@@ -259,8 +298,22 @@ const Index = () => {
                 </CardContent>
               </Card>
             )}
-          </div>
-        </div>
+            
+            <div className="flex justify-between mt-4">
+              <Button onClick={() => setActiveTab("items")} variant="outline">
+                Back to Items
+              </Button>
+              {packingResult && (
+                <Button onClick={() => {
+                  setPackingResult(null);
+                  toast.info("Visualization cleared");
+                }} variant="outline" className="text-destructive">
+                  Clear Visualization
+                </Button>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
