@@ -1,9 +1,28 @@
-import { BoxDimensions, Item, PackedItem, PackingResult } from "@/types";
+import { BoxDimensions, Item, PackedItem, PackingResult, OptimizeOptions } from "@/types";
 
 // Enhanced 3D bin packing algorithm with improved space utilization
-export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
+export const packItems = (box: BoxDimensions, items: Item[], options?: OptimizeOptions): PackingResult => {
+  // Set default options if not provided
+  const packingOptions = options || { allowRotation: true, allowStacking: true };
+  
   // Deep copy items to avoid mutating the original array
   const itemsToProcess = JSON.parse(JSON.stringify(items)) as Item[];
+  
+  // Apply global rotation and stacking settings if specified
+  if (packingOptions) {
+    itemsToProcess.forEach(item => {
+      // Override individual rotation settings with global setting if specified
+      if (packingOptions.allowRotation !== undefined) {
+        item.allowRotation = packingOptions.allowRotation;
+      }
+      
+      // Override individual stacking settings with global setting if specified
+      if (packingOptions.allowStacking !== undefined) {
+        item.maxStack = packingOptions.allowStacking;
+      }
+    });
+  }
+  
   const packedItems: PackedItem[] = [];
   const unpackedItems: Item[] = [];
   const packingInstructions: string[] = [];
@@ -72,7 +91,11 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
         const space = spaces[s];
 
         // GRAVITY CONSTRAINT: Skip spaces that aren't on the floor or on top of another item
-        if (space.y > 0) {
+        // Only apply this constraint if stacking is not allowed for this item
+        if (space.y > 0 && !item.maxStack) {
+          // Skip spaces that aren't on the floor
+          continue;
+        } else if (space.y > 0) {
           // Check if this space is supported by an item below
           const hasSupport = checkIfSpaceHasSupport(space, packedItems, boxWidth, boxDepth);
           
@@ -886,7 +909,7 @@ const tryMergeSpaces = (space1: any, space2: any): any => {
 };
 
 // Function to find the optimal box size with improved algorithm
-export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): PackingResult => {
+export const findOptimalBoxSize = (items: Item[], options?: OptimizeOptions): PackingResult => {
   if (!items || items.length === 0) {
     return {
       success: false,
@@ -913,7 +936,7 @@ export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): 
   
   // Find the maximum dimensions, considering all possible orientations
   itemsToProcess.forEach(item => {
-    if (item.allowRotation !== false) {
+    if ((options && options.allowRotation) || (item.allowRotation !== false && options?.allowRotation !== false)) {
       // If the item can be rotated, consider all dimensions
       maxItemWidth = Math.max(maxItemWidth, item.width, item.height, item.depth);
       maxItemHeight = Math.max(maxItemHeight, item.width, item.height, item.depth);
@@ -928,7 +951,7 @@ export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): 
   
   // Initial guess for box dimensions with buffer factor - using a larger buffer for optimization
   // When optimizing, we want to ensure ALL items fit, so we use a larger buffer
-  const bufferFactor = aggressive ? 1.3 : 1.5; // Increased from 1.1/1.25 to 1.3/1.5
+  const bufferFactor = 1.3; // Moderate buffer for first attempt
   
   // Start with a simple cuboid approach - using cubic root to approximate dimensions
   const cubeRoot = Math.cbrt(totalItemsVolume * bufferFactor);
@@ -959,11 +982,11 @@ export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): 
   };
   
   // Try packing items into the initial box
-  let packingResult = packItems(currentBoxDimensions, itemsToProcess);
+  let packingResult = packItems(currentBoxDimensions, itemsToProcess, options);
   
   // Keep increasing box size until all items fit
   let attempts = 0;
-  const maxAttempts = 10; // Limit to prevent infinite loops
+  const maxAttempts = 15; // Increased max attempts to ensure all items fit
   
   while (packingResult.unpackedItems.length > 0 && attempts < maxAttempts) {
     attempts++;
@@ -976,7 +999,7 @@ export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): 
       depth: Math.ceil(currentBoxDimensions.depth * growthFactor)
     };
     
-    packingResult = packItems(currentBoxDimensions, itemsToProcess);
+    packingResult = packItems(currentBoxDimensions, itemsToProcess, options);
   }
   
   // If we still have unpacked items after multiple attempts, try a different approach
@@ -986,8 +1009,8 @@ export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): 
       sum + (item.width * item.height * item.depth * item.quantity), 0);
     
     // Create a box with dimensions proportional to the largest items but big enough for all
-    // Use a generous buffer factor of 2.0 to ensure everything fits
-    const finalBuffer = 2.0;
+    // Use a generous buffer factor of 2.5 to ensure everything fits
+    const finalBuffer = 2.5;
     const finalCubeRoot = Math.cbrt(totalVolume * finalBuffer);
     
     const finalBox = {
@@ -997,13 +1020,24 @@ export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): 
     };
     
     // Try one final packing with a very large box
-    packingResult = packItems(finalBox, itemsToProcess);
+    packingResult = packItems(finalBox, itemsToProcess, options);
+    
+    // If we still have unpacked items, try one more time with an even larger box
+    if (packingResult.unpackedItems.length > 0) {
+      const extremeBox = {
+        width: Math.ceil(finalBox.width * 1.5),
+        height: Math.ceil(finalBox.height * 1.5),
+        depth: Math.ceil(finalBox.depth * 1.5)
+      };
+      
+      packingResult = packItems(extremeBox, itemsToProcess, options);
+    }
   }
   
   return packingResult;
 };
 
 // Helper function to try packing with specific dimensions
-const tryPackingWithDimensions = (items: Item[], dimensions: BoxDimensions): PackingResult => {
-  return packItems(dimensions, items);
+const tryPackingWithDimensions = (items: Item[], dimensions: BoxDimensions, options?: OptimizeOptions): PackingResult => {
+  return packItems(dimensions, items, options);
 };

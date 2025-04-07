@@ -1,4 +1,3 @@
-
 export interface BoxDimensions {
   width: number;
   height: number;
@@ -30,4 +29,9 @@ export interface PackingResult {
   utilizationPercentage: number;
   packingInstructions: string[];
   boxDimensions: BoxDimensions;
+}
+
+export interface OptimizeOptions {
+  allowRotation: boolean;
+  allowStacking: boolean;
 }
