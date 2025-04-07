@@ -1,7 +1,6 @@
-
 import { useRef, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, TransformControls, Center, Grid, Environment, PerspectiveCamera } from "@react-three/drei";
+import { OrbitControls, TransformControls, Center, Grid, Environment, PerspectiveCamera, Edges } from "@react-three/drei";
 import { BoxDimensions, PackedItem } from "@/types";
 import html2canvas from "html2canvas";
 import { Button } from "@/components/ui/button";
@@ -37,7 +36,6 @@ const BoxVisualization = ({
   const [generatingSteps, setGeneratingSteps] = useState(false);
 
   useEffect(() => {
-    // Reset packing steps when items change
     setPackingSteps([]);
   }, [packedItems]);
 
@@ -65,26 +63,19 @@ const BoxVisualization = ({
     toast.info("Generating packing step images...");
 
     try {
-      // For each item, create a snapshot showing only items up to that point
       const steps: { image: string; itemId: string }[] = [];
 
-      // Save current camera position
       const originalCameraPos = [...cameraPosition] as [number, number, number];
       
-      // Set a good camera angle for step images
       setCameraPosition([5, 5, 5]);
       
-      // Wait for camera position to update and scene to render
       await new Promise(resolve => setTimeout(resolve, 500));
 
       for (let i = 0; i < packedItems.length; i++) {
-        // Highlight only items up to the current step
         setShowingStep(i);
         
-        // Wait for the visualization to update
         await new Promise(resolve => setTimeout(resolve, 200));
         
-        // Capture the current state
         const canvas = await html2canvas(canvasRef.current);
         const image = canvas.toDataURL("image/png");
         
@@ -94,7 +85,6 @@ const BoxVisualization = ({
         });
       }
 
-      // Reset view
       setShowingStep(null);
       setCameraPosition(originalCameraPos);
       
@@ -167,7 +157,6 @@ const BoxVisualization = ({
       
       printWindow.document.close();
       
-      // Wait for content to load before printing
       setTimeout(() => {
         printWindow.print();
       }, 500);
@@ -216,22 +205,18 @@ const BoxVisualization = ({
     setHighlightedItem(itemId);
   };
 
-  // Extract item instruction number from the string
   const getItemNumberFromInstruction = (instruction: string): number => {
     const match = instruction.match(/^(\d+)\./);
     return match ? parseInt(match[1], 10) : 0;
   };
 
-  // Extract item id from instruction based on its position in the array (assuming order is maintained)
   const getItemIdFromInstruction = (instructionIndex: number): string | null => {
     if (instructionIndex < 0 || instructionIndex >= packedItems.length) return null;
     return packedItems[instructionIndex].id;
   };
 
-  // Function to scale down dimensions for better visualization
   const scaleDown = (value: number) => value / 100;
 
-  // Scaled box dimensions
   const scaledWidth = scaleDown(boxDimensions.width);
   const scaledHeight = scaleDown(boxDimensions.height);
   const scaledDepth = scaleDown(boxDimensions.depth);
@@ -338,19 +323,15 @@ const BoxVisualization = ({
                       const instructionNum = instructionParts[0];
                       const instructionText = instructionParts.slice(1).join('.').trim();
                       
-                      // Extract position from the instruction using regex
                       const positionMatch = instructionText.match(/position \(([\d.]+)cm, ([\d.]+)cm, ([\d.]+)cm\)/);
                       const positionText = positionMatch ? `(${positionMatch[1]}, ${positionMatch[2]}, ${positionMatch[3]})` : "";
                       
-                      // Extract item name
                       const itemNameMatch = instructionText.match(/Place ([^(]+) at/);
                       const itemName = itemNameMatch ? itemNameMatch[1].trim() : "Item";
                       
-                      // Extract rotation info
                       const rotationMatch = instructionText.match(/rotated (.+)\.$/);
                       const rotationText = rotationMatch ? rotationMatch[1] : "";
                       
-                      // Find the step image that corresponds to this item
                       const stepImage = packingSteps.find(step => step.itemId === itemId);
                       
                       return (
@@ -465,9 +446,7 @@ const BoxVisualization = ({
               <ambientLight intensity={0.5} />
               <directionalLight position={[5, 10, 5]} intensity={1} castShadow />
               
-              {/* Center everything */}
               <Center>
-                {/* Box container base (floor) */}
                 <mesh 
                   position={[0, -scaledHeight/2, 0]} 
                   receiveShadow
@@ -476,15 +455,12 @@ const BoxVisualization = ({
                   <meshStandardMaterial color="#a0aec0" roughness={0.8} />
                 </mesh>
                 
-                {/* Box container walls */}
                 <mesh position={[0, 0, 0]} receiveShadow>
                   <boxGeometry args={[scaledWidth, scaledHeight, scaledDepth]} />
                   <meshStandardMaterial wireframe={true} color="#475569" opacity={0.3} transparent />
                 </mesh>
                 
-                {/* Packed items */}
                 {packedItems.map((item, index) => {
-                  // Skip rendering items if we're showing steps and this item comes after the current step
                   if (showingStep !== null && index > showingStep) {
                     return null;
                   }
@@ -493,7 +469,6 @@ const BoxVisualization = ({
                   const scaledItemHeight = scaleDown(item.height);
                   const scaledItemDepth = scaleDown(item.depth);
                   
-                  // Calculate position
                   const halfBoxWidth = scaledWidth / 2;
                   const halfBoxHeight = scaledHeight / 2;
                   const halfBoxDepth = scaledDepth / 2;
@@ -506,10 +481,7 @@ const BoxVisualization = ({
                   const posY = scaledPosY - halfBoxHeight;
                   const posZ = scaledPosZ - halfBoxDepth;
 
-                  // Check if this item is highlighted
                   const isHighlighted = item.id === highlightedItem;
-                  
-                  // Highlight the current step item
                   const isCurrentStepItem = showingStep !== null && index === showingStep;
 
                   return (
@@ -527,6 +499,12 @@ const BoxVisualization = ({
                         roughness={0.8}
                         emissive={isHighlighted || isCurrentStepItem ? "#60a5fa" : "#000000"}
                         emissiveIntensity={isHighlighted || isCurrentStepItem ? 0.5 : 0}
+                      />
+                      <Edges 
+                        threshold={15}
+                        color="#000000e6"
+                        scale={1.001}
+                        lineWidth={1}
                       />
                     </mesh>
                   );
