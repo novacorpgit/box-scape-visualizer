@@ -1,14 +1,14 @@
+
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Table, TableBody } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Item } from "@/types";
 import { getRandomColor } from "@/utils/colorUtils";
 import { toast } from "sonner";
-import { Copy, ClipboardPaste, Table as TableIcon, RotateCw } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import ItemTableHeader from "@/components/items/TableHeader";
+import ItemTableRow from "@/components/items/TableRow";
+import TableActions from "@/components/items/TableActions";
+import ItemFormActions from "@/components/items/ItemFormActions";
 
 interface ItemsTableProps {
   onSubmit: (items: Item[]) => void;
@@ -148,26 +148,7 @@ const ItemsTable = ({ onSubmit, isDisabled, initialItems }: ItemsTableProps) => 
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Items to Pack</CardTitle>
-          <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={copyToClipboard}
-              title="Copy to clipboard as TSV (tab-separated values)"
-            >
-              <Copy className="mr-2 h-4 w-4" />
-              Copy
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => toast.info("Paste data from Excel by clicking on a cell and pressing Ctrl+V")}
-              title="Paste from Excel/Google Sheets"
-            >
-              <ClipboardPaste className="mr-2 h-4 w-4" />
-              How to Paste
-            </Button>
-          </div>
+          <TableActions onCopyToClipboard={copyToClipboard} />
         </div>
       </CardHeader>
       <CardContent>
@@ -175,128 +156,25 @@ const ItemsTable = ({ onSubmit, isDisabled, initialItems }: ItemsTableProps) => 
           <div className="border rounded-md overflow-hidden">
             <div className="overflow-x-auto">
               <Table ref={tableRef}>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Width (cm)</TableHead>
-                    <TableHead>Height (cm)</TableHead>
-                    <TableHead>Depth (cm)</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Weight (kg)</TableHead>
-                    <TableHead>Allow Stacking</TableHead>
-                    <TableHead>Allow Rotation</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <ItemTableHeader />
                 <TableBody onPaste={handlePaste}>
-                  {items.map((item, index) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <Input
-                          value={item.name}
-                          onChange={(e) => handleCellChange(item.id, "name", e.target.value)}
-                          className="min-w-[120px]"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.width}
-                          onChange={(e) => handleCellChange(item.id, "width", e.target.value)}
-                          className="w-full"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.height}
-                          onChange={(e) => handleCellChange(item.id, "height", e.target.value)}
-                          className="w-full"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.depth}
-                          onChange={(e) => handleCellChange(item.id, "depth", e.target.value)}
-                          className="w-full"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => handleCellChange(item.id, "quantity", e.target.value)}
-                          className="w-full"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0.1"
-                          step="0.1"
-                          value={item.weight}
-                          onChange={(e) => handleCellChange(item.id, "weight", e.target.value)}
-                          className="w-full"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center">
-                          <Checkbox 
-                            id={`maxStack-${item.id}`} 
-                            checked={item.maxStack === true || (typeof item.maxStack === 'number' && item.maxStack > 0)}
-                            onCheckedChange={(checked) => handleCellChange(item.id, "maxStack", !!checked)}
-                            className="mx-auto"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center">
-                          <Checkbox 
-                            id={`allowRotation-${item.id}`} 
-                            checked={item.allowRotation !== false}
-                            onCheckedChange={(checked) => handleCellChange(item.id, "allowRotation", !!checked)}
-                            className="mx-auto"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => removeRow(item.id)}
-                          className="h-8 px-2"
-                        >
-                          Remove
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                  {items.map((item) => (
+                    <ItemTableRow
+                      key={item.id}
+                      item={item}
+                      onRemove={removeRow}
+                      onChange={handleCellChange}
+                    />
                   ))}
                 </TableBody>
               </Table>
             </div>
           </div>
           
-          <div className="flex flex-col gap-2">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={addRow}
-            >
-              Add Another Item
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={isDisabled}
-            >
-              Calculate Packing Layout
-            </Button>
-          </div>
+          <ItemFormActions 
+            onAddItem={addRow}
+            isDisabled={isDisabled}
+          />
         </form>
       </CardContent>
     </Card>

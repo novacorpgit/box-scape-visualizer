@@ -886,7 +886,7 @@ const tryMergeSpaces = (space1: any, space2: any): any => {
 };
 
 // Function to find the optimal box size with improved algorithm
-export const findOptimalBoxSize = (items: Item[]): PackingResult => {
+export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): PackingResult => {
   if (!items || items.length === 0) {
     return {
       success: false,
@@ -902,7 +902,7 @@ export const findOptimalBoxSize = (items: Item[]): PackingResult => {
   const itemsToProcess = JSON.parse(JSON.stringify(items)) as Item[];
   
   // Calculate total volume needed with a more realistic buffer
-  const totalItemVolume = itemsToProcess.reduce((total, item) => {
+  const totalItemsVolume = itemsToProcess.reduce((total, item) => {
     return total + (item.width * item.height * item.depth * item.quantity);
   }, 0);
   
@@ -927,10 +927,10 @@ export const findOptimalBoxSize = (items: Item[]): PackingResult => {
   });
   
   // Initial guess for box dimensions with buffer factor
-  const bufferFactor = 1.15; // 15% buffer
+  const bufferFactor = aggressive ? 1.1 : 1.25; // 15% buffer
   
   // Start with a simple cuboid approach - using cubic root to approximate dimensions
-  const cubeRoot = Math.cbrt(totalItemVolume * bufferFactor);
+  const cubeRoot = Math.cbrt(totalItemsVolume * bufferFactor);
   
   // Create an initial box slightly larger than the cube root estimate,
   // but respecting the maximum item dimensions
@@ -1013,4 +1013,9 @@ export const findOptimalBoxSize = (items: Item[]): PackingResult => {
   }
   
   return packingResult;
+};
+
+// Helper function to try packing with specific dimensions
+const tryPackingWithDimensions = (items: Item[], dimensions: BoxDimensions): PackingResult => {
+  return packItems(dimensions, items);
 };
