@@ -32,6 +32,14 @@ const BoxVisualization = ({
   const [instructionsCopied, setInstructionsCopied] = useState(false);
   const [instructionView, setInstructionView] = useState<"list" | "visual">("list");
   const [highlightedItem, setHighlightedItem] = useState<string | null>(null);
+  const [packingSteps, setPackingSteps] = useState<{ image: string; itemId: string }[]>([]);
+  const [showingStep, setShowingStep] = useState<number | null>(null);
+  const [generatingSteps, setGeneratingSteps] = useState(false);
+
+  useEffect(() => {
+    // Reset packing steps when items change
+    setPackingSteps([]);
+  }, [packedItems]);
 
   const downloadImage = async () => {
     if (!canvasRef.current) return;
@@ -47,6 +55,56 @@ const BoxVisualization = ({
     } catch (error) {
       toast.error("Failed to download image");
       console.error("Error downloading image:", error);
+    }
+  };
+
+  const generatePackingSteps = async () => {
+    if (!canvasRef.current || packedItems.length === 0) return;
+
+    setGeneratingSteps(true);
+    toast.info("Generating packing step images...");
+
+    try {
+      // For each item, create a snapshot showing only items up to that point
+      const steps: { image: string; itemId: string }[] = [];
+
+      // Save current camera position
+      const originalCameraPos = [...cameraPosition];
+      
+      // Set a good camera angle for step images
+      setCameraPosition([5, 5, 5]);
+      
+      // Wait for camera position to update and scene to render
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      for (let i = 0; i < packedItems.length; i++) {
+        // Highlight only items up to the current step
+        setShowingStep(i);
+        
+        // Wait for the visualization to update
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Capture the current state
+        const canvas = await html2canvas(canvasRef.current);
+        const image = canvas.toDataURL("image/png");
+        
+        steps.push({
+          image,
+          itemId: packedItems[i].id
+        });
+      }
+
+      // Reset view
+      setShowingStep(null);
+      setCameraPosition(originalCameraPos);
+      
+      setPackingSteps(steps);
+      toast.success("Packing steps generated successfully!");
+    } catch (error) {
+      toast.error("Failed to generate packing steps");
+      console.error("Error generating steps:", error);
+    } finally {
+      setGeneratingSteps(false);
     }
   };
 
@@ -90,7 +148,11 @@ const BoxVisualization = ({
               .item-name { font-weight: bold; color: #2563eb; }
               .item-position { display: inline-block; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; margin: 0 4px; }
               .item-rotation { font-style: italic; color: #64748b; }
+              .step-image { max-width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 5px; margin: 10px 0; }
               img { max-width: 100%; height: auto; margin: 20px 0; }
+              .packing-step { page-break-inside: avoid; margin-bottom: 30px; border: 1px solid #e2e8f0; padding: 15px; border-radius: 5px; }
+              .step-header { display: flex; align-items: center; margin-bottom: 10px; }
+              .step-number { font-size: 18px; font-weight: bold; margin-right: 10px; color: #2563eb; }
               @media print {
                 .no-break { page-break-inside: avoid; }
               }
@@ -219,6 +281,17 @@ const BoxVisualization = ({
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium">Packing Instructions</h3>
               <div className="flex gap-2">
+                {packingSteps.length === 0 && !generatingSteps && (
+                  <Button 
+                    onClick={generatePackingSteps} 
+                    variant="outline" 
+                    size="sm"
+                    disabled={generatingSteps}
+                  >
+                    <PackageCheck className="h-4 w-4 mr-1" />
+                    {generatingSteps ? "Generating..." : "Generate Step Images"}
+                  </Button>
+                )}
                 <Button 
                   onClick={printInstructions} 
                   variant="outline" 
@@ -277,6 +350,9 @@ const BoxVisualization = ({
                       const rotationMatch = instructionText.match(/rotated (.+)\.$/);
                       const rotationText = rotationMatch ? rotationMatch[1] : "";
                       
+                      // Find the step image that corresponds to this item
+                      const stepImage = packingSteps.find(step => step.itemId === itemId);
+                      
                       return (
                         <div 
                           key={index} 
@@ -290,7 +366,7 @@ const BoxVisualization = ({
                             <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-medium mr-3 shrink-0">
                               {instructionNum}
                             </span>
-                            <div>
+                            <div className="flex-1">
                               <p className="mb-2">
                                 Place <span className="font-medium text-primary">{itemName}</span> at position 
                                 <span className="inline-block bg-gray-100 px-1.5 py-0.5 rounded mx-1.5 font-mono text-sm">
@@ -303,52 +379,17 @@ const BoxVisualization = ({
                                   <span className="font-medium">Rotation:</span> {rotationText}
                                 </p>
                               )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {packedItems.map((item, index) => {
-                      const instructionIndex = index;
-                      const instruction = packingInstructions[instructionIndex] || '';
-                      
-                      return (
-                        <div 
-                          key={item.id}
-                          className={`border rounded-md overflow-hidden ${
-                            item.id === highlightedItem ? "bg-blue-50 border-blue-300" : "bg-white border-gray-200"
-                          }`}
-                          onMouseEnter={() => highlightItemInVisualization(item.id)}
-                          onMouseLeave={() => highlightItemInVisualization(null)}
-                        >
-                          <div className="p-3 flex items-center border-b bg-gray-50">
-                            <Package className="h-5 w-5 text-primary mr-2" />
-                            <span className="font-medium">{item.name}</span>
-                            <span className="ml-auto text-sm text-muted-foreground">Step {instructionIndex + 1}</span>
-                          </div>
-                          <div className="p-3">
-                            <div className="grid grid-cols-3 gap-2 mb-3">
-                              <div className="bg-gray-100 p-2 rounded text-center">
-                                <div className="text-xs text-muted-foreground">Width</div>
-                                <div className="font-medium">{item.width} cm</div>
-                              </div>
-                              <div className="bg-gray-100 p-2 rounded text-center">
-                                <div className="text-xs text-muted-foreground">Height</div>
-                                <div className="font-medium">{item.height} cm</div>
-                              </div>
-                              <div className="bg-gray-100 p-2 rounded text-center">
-                                <div className="text-xs text-muted-foreground">Depth</div>
-                                <div className="font-medium">{item.depth} cm</div>
-                              </div>
-                            </div>
-                            <div className="text-sm">
-                              <div className="mb-1"><span className="font-medium">Position:</span> ({Math.round(item.position[0])}cm, {Math.round(item.position[1])}cm, {Math.round(item.position[2])}cm)</div>
-                              {(item.rotation[0] !== 0 || item.rotation[1] !== 0 || item.rotation[2] !== 0) && (
-                                <div className="text-sm text-muted-foreground italic">
-                                  <span className="font-medium">Rotation:</span> {item.rotation.map((r, i) => r !== 0 ? `${r}° ${i === 0 ? 'X' : i === 1 ? 'Y' : 'Z'}` : null).filter(Boolean).join(', ')}
+                              
+                              {stepImage && (
+                                <div className="mt-3 border rounded overflow-hidden">
+                                  <img 
+                                    src={stepImage.image} 
+                                    alt={`Packing step ${index + 1}`} 
+                                    className="w-full"
+                                  />
+                                  <div className="bg-gray-100 px-3 py-1 text-xs text-center">
+                                    Step {index + 1}: After placing {itemName}
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -356,6 +397,54 @@ const BoxVisualization = ({
                         </div>
                       );
                     })}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {packingSteps.length > 0 ? (
+                      packingSteps.map((step, index) => {
+                        const item = packedItems.find(i => i.id === step.itemId);
+                        return (
+                          <div 
+                            key={index}
+                            className="packing-step"
+                          >
+                            <div className="step-header">
+                              <div className="step-number">Step {index + 1}</div>
+                              <div className="font-medium">{item?.name || "Item"}</div>
+                            </div>
+                            <img 
+                              src={step.image} 
+                              alt={`Packing step ${index + 1}`} 
+                              className="step-image"
+                            />
+                            <div className="p-3 bg-gray-50 rounded mt-2">
+                              <p>
+                                <span className="font-medium">Position:</span> ({Math.round(item?.position[0] || 0)}cm, {Math.round(item?.position[1] || 0)}cm, {Math.round(item?.position[2] || 0)}cm)
+                              </p>
+                              {item && (item.rotation[0] !== 0 || item.rotation[1] !== 0 || item.rotation[2] !== 0) && (
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  <span className="font-medium">Rotation:</span> {item.rotation.map((r, i) => r !== 0 ? `${r}° ${i === 0 ? 'X' : i === 1 ? 'Y' : 'Z'}` : null).filter(Boolean).join(', ')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-8">
+                        <PackageCheck className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium mb-2">No Step Images Generated</h3>
+                        <p className="text-muted-foreground max-w-md mx-auto mb-4">
+                          Generate step images to see a visual guide of how to pack your items in sequence.
+                        </p>
+                        <Button 
+                          onClick={generatePackingSteps}
+                          disabled={generatingSteps}
+                        >
+                          {generatingSteps ? "Generating..." : "Generate Step Images"}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </ScrollArea>
@@ -394,32 +483,34 @@ const BoxVisualization = ({
                 </mesh>
                 
                 {/* Packed items */}
-                {packedItems.map((item) => {
+                {packedItems.map((item, index) => {
+                  // Skip rendering items if we're showing steps and this item comes after the current step
+                  if (showingStep !== null && index > showingStep) {
+                    return null;
+                  }
+                  
                   const scaledItemWidth = scaleDown(item.width);
                   const scaledItemHeight = scaleDown(item.height);
                   const scaledItemDepth = scaleDown(item.depth);
                   
-                  // Calculate position - critically important for proper placement
-                  // The origin (0,0,0) is the center of the box
-                  // We need to transform item coordinates to be relative to the center
-                  
+                  // Calculate position
                   const halfBoxWidth = scaledWidth / 2;
                   const halfBoxHeight = scaledHeight / 2;
                   const halfBoxDepth = scaledDepth / 2;
                   
-                  // Transform from corner-origin to center-origin coordinate system
-                  // Start by scaling down the positions
                   const scaledPosX = scaleDown(item.position[0]);
                   const scaledPosY = scaleDown(item.position[1]);
                   const scaledPosZ = scaleDown(item.position[2]);
                   
-                  // Then shift so (0,0,0) is box center instead of corner
                   const posX = scaledPosX - halfBoxWidth;
                   const posY = scaledPosY - halfBoxHeight;
                   const posZ = scaledPosZ - halfBoxDepth;
 
                   // Check if this item is highlighted
                   const isHighlighted = item.id === highlightedItem;
+                  
+                  // Highlight the current step item
+                  const isCurrentStepItem = showingStep !== null && index === showingStep;
 
                   return (
                     <mesh
@@ -431,11 +522,11 @@ const BoxVisualization = ({
                     >
                       <boxGeometry args={[scaledItemWidth, scaledItemHeight, scaledItemDepth]} />
                       <meshStandardMaterial 
-                        color={isHighlighted ? "#3b82f6" : item.color} 
+                        color={isHighlighted || isCurrentStepItem ? "#3b82f6" : item.color} 
                         metalness={0.1}
                         roughness={0.8}
-                        emissive={isHighlighted ? "#60a5fa" : "#000000"}
-                        emissiveIntensity={isHighlighted ? 0.5 : 0}
+                        emissive={isHighlighted || isCurrentStepItem ? "#60a5fa" : "#000000"}
+                        emissiveIntensity={isHighlighted || isCurrentStepItem ? 0.5 : 0}
                       />
                     </mesh>
                   );
