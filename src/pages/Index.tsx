@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import BoxDimensionsForm from "@/components/BoxDimensionsForm";
 import ItemsForm from "@/components/ItemsForm";
@@ -85,6 +84,20 @@ const Index = () => {
     toast.info("Reset all data");
   };
 
+  const handleTabChange = (value: string) => {
+    if (value === "items" && !boxDimensions) {
+      toast.error("Please set box dimensions first");
+      return;
+    }
+    
+    if (value === "visualization" && (!boxDimensions || currentItems.length === 0)) {
+      toast.error("Please set box dimensions and add items first");
+      return;
+    }
+    
+    setActiveTab(value);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-8">
       <div className="container mx-auto px-4">
@@ -102,7 +115,7 @@ const Index = () => {
           </Button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="dimensions" className="flex items-center gap-2">
               <Box className="h-4 w-4" />
@@ -214,7 +227,6 @@ const Index = () => {
               )}
             </div>
 
-            {/* Added optimization button for the visualization tab */}
             {currentItems.length > 0 && !isOptimized && (
               <Card className="mt-4 border-blue-200 bg-blue-50">
                 <CardContent className="py-4">
