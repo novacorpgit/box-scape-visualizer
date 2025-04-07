@@ -1,6 +1,7 @@
+
 import { useState } from "react";
 import BoxDimensionsForm from "@/components/BoxDimensionsForm";
-import { PackingResult, BoxDimensions, Item } from "@/types";
+import { PackingResult, BoxDimensions, Item, OptimizeOptions } from "@/types";
 import { packItems, findOptimalBoxSize } from "@/services/packingService";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -51,14 +52,20 @@ const Index = () => {
     setActiveTab("visualization");
   };
   
-  const handleOptimizeBoxSize = () => {
+  const handleOptimizeBoxSize = (options?: OptimizeOptions) => {
     if (currentItems.length === 0) {
       toast.error("Please add items first");
       setActiveTab("items");
       return;
     }
     
-    const optimizedResult = findOptimalBoxSize(currentItems, true);
+    // Use the provided options or default to allowing both rotation and stacking
+    const packingOptions: OptimizeOptions = options || { 
+      allowRotation: true, 
+      allowStacking: true 
+    };
+    
+    const optimizedResult = findOptimalBoxSize(currentItems, packingOptions);
     setPackingResult(optimizedResult);
     setBoxDimensions(optimizedResult.boxDimensions);
     setIsOptimized(true);
