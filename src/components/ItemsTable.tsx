@@ -248,7 +248,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
                         <div className="flex items-center justify-center">
                           <Checkbox 
                             id={`maxStack-${item.id}`} 
-                            checked={item.maxStack === true || (typeof item.maxStack === 'number' && item.maxStack > 1)}
+                            checked={item.maxStack === true || (typeof item.maxStack === 'number' && item.maxStack > 0)}
                             onCheckedChange={(checked) => handleCellChange(item.id, "maxStack", !!checked)}
                             className="mx-auto"
                           />

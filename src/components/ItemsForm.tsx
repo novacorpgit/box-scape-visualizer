@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,9 +24,9 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
       depth: 20,
       quantity: 1,
       weight: 1,
-      maxStack: true, // Default to allow stacking
+      maxStack: true,
       color: getRandomColor(),
-      allowRotation: true, // Default to allow rotation
+      allowRotation: true,
     },
   ]);
 
@@ -40,9 +39,9 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
       depth: 20,
       quantity: 1,
       weight: 1,
-      maxStack: true, // Default to allow stacking
+      maxStack: true,
       color: getRandomColor(),
-      allowRotation: true, // Default to allow rotation
+      allowRotation: true,
     };
     setItems([...items, newItem]);
   };
@@ -188,7 +187,7 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
                 <div className="flex items-center space-x-2">
                   <Checkbox 
                     id={`maxStack-${item.id}`} 
-                    checked={item.maxStack === true || item.maxStack > 1}
+                    checked={item.maxStack === true || (typeof item.maxStack === 'number' && item.maxStack > 0)}
                     onCheckedChange={(checked) => handleItemChange(item.id, "maxStack", !!checked)}
                   />
                   <div className="flex items-center gap-1">
