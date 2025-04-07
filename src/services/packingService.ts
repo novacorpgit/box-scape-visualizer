@@ -1,4 +1,3 @@
-
 import { BoxDimensions, Item, PackedItem, PackingResult } from "@/types";
 
 // Enhanced 3D bin packing algorithm with improved space utilization
@@ -81,14 +80,13 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
             orientation.depth <= space.depth
           ) {
             // IMPROVED BOUNDARY CHECK: Ensure the item is fully within the box boundaries
-            // This prevents items from extending outside the box
             if (
               space.x + orientation.width <= boxWidth &&
               space.y + orientation.height <= boxHeight &&
               space.z + orientation.depth <= boxDepth
             ) {
-              // Check for collisions with already packed items
-              const wouldCollide = checkCollision(
+              // FIX: Use a more precise collision detection with a smaller tolerance
+              const wouldCollide = checkCollisionPrecise(
                 space.x, 
                 space.y, 
                 space.z, 
@@ -101,7 +99,6 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
               // Only consider this position if there's no collision
               if (!wouldCollide) {
                 // Enhanced scoring system to minimize gaps
-                // Lower score means better placement
                 const score = calculatePlacementScore(space, orientation, boxWidth, boxHeight, boxDepth, packedItems);
                   
                 if (score < bestScore) {
@@ -125,35 +122,30 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
         const space = spaces[bestSpace];
         
         // Calculate the actual position of the item in the box
-        // These coordinates are from the center of the item
         const itemX = bestPosition.x + (bestOrientation.width / 2);
         const itemY = bestPosition.y + (bestOrientation.height / 2);
         const itemZ = bestPosition.z + (bestOrientation.depth / 2);
         
-        // Add the item to packed items
-        const packedItem: PackedItem = {
-          ...item,
-          id: `${item.id}-${i}`,
-          width: bestOrientation.width,
-          height: bestOrientation.height,
-          depth: bestOrientation.depth,
-          position: [itemX, itemY, itemZ],
-          rotation: bestOrientation.rotation,
-        };
-        
-        // Perform a final collision check before adding the item
-        const hasCollision = checkCollision(
-          bestPosition.x, 
-          bestPosition.y, 
-          bestPosition.z, 
-          bestOrientation.width, 
-          bestOrientation.height, 
-          bestOrientation.depth, 
-          packedItems
-        );
-        
-        // Only add the item if there's no collision
-        if (!hasCollision) {
+        // FINAL VALIDATION: Double check that the item is fully within box boundaries
+        if (
+          itemX - bestOrientation.width/2 >= 0 && 
+          itemX + bestOrientation.width/2 <= boxWidth &&
+          itemY - bestOrientation.height/2 >= 0 && 
+          itemY + bestOrientation.height/2 <= boxHeight &&
+          itemZ - bestOrientation.depth/2 >= 0 && 
+          itemZ + bestOrientation.depth/2 <= boxDepth
+        ) {
+          // Add the item to packed items
+          const packedItem: PackedItem = {
+            ...item,
+            id: `${item.id}-${i}`,
+            width: bestOrientation.width,
+            height: bestOrientation.height,
+            depth: bestOrientation.depth,
+            position: [itemX, itemY, itemZ],
+            rotation: bestOrientation.rotation,
+          };
+          
           // Create packing instruction for this item
           const rotationText = getRotationText(bestOrientation.rotation);
           const instruction = `${itemCounter}. Place ${item.name} at position (${Math.round(bestPosition.x)}cm, ${Math.round(bestPosition.y)}cm, ${Math.round(bestPosition.z)}cm)${rotationText ? ` ${rotationText}` : ''}.`;
@@ -164,8 +156,8 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
           totalVolume += itemVolume;
           packed = true;
 
-          // Use the improved space splitting algorithm
-          const newSpaces = splitSpaceExhaustive(
+          // Use the improved space splitting algorithm with bias towards larger spaces
+          const newSpaces = splitSpaceImproved(
             space,
             bestPosition.x,
             bestPosition.y,
@@ -179,7 +171,7 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
           spaces.splice(bestSpace, 1, ...newSpaces);
           
           // Enhanced space management - more aggressive cleanup
-          cleanupSpacesComplete(spaces);
+          cleanupSpacesImproved(spaces);
         }
       }
 
@@ -202,9 +194,8 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
   };
 };
 
-// NEW FUNCTION: Check for collisions between items
-// Returns true if there is a collision
-const checkCollision = (
+// NEW: More precise collision detection with smaller tolerance
+const checkCollisionPrecise = (
   x: number, 
   y: number, 
   z: number, 
@@ -221,10 +212,12 @@ const checkCollision = (
   const z1 = z;
   const z2 = z + depth;
   
+  // Very small tolerance to avoid floating point issues
+  const tolerance = 0.001;
+  
   // Check collision with each packed item
   for (const item of packedItems) {
-    // Calculate bounds of the packed item
-    // Adjust the position (which is the center) to get the corner
+    // Calculate bounds of the packed item from its center position
     const itemX1 = item.position[0] - item.width / 2;
     const itemX2 = item.position[0] + item.width / 2;
     const itemY1 = item.position[1] - item.height / 2;
@@ -232,12 +225,11 @@ const checkCollision = (
     const itemZ1 = item.position[2] - item.depth / 2;
     const itemZ2 = item.position[2] + item.depth / 2;
     
-    // Check for overlap in all dimensions
-    // Add a small buffer (0.1) to avoid floating point precision issues
+    // Check for overlap in all dimensions with reduced tolerance
     if (
-      x1 < itemX2 + 0.1 && x2 > itemX1 - 0.1 &&
-      y1 < itemY2 + 0.1 && y2 > itemY1 - 0.1 &&
-      z1 < itemZ2 + 0.1 && z2 > itemZ1 - 0.1
+      x1 < itemX2 - tolerance && x2 > itemX1 + tolerance &&
+      y1 < itemY2 - tolerance && y2 > itemY1 + tolerance &&
+      z1 < itemZ2 - tolerance && z2 > itemZ1 + tolerance
     ) {
       // Collision detected
       return true;
@@ -312,23 +304,25 @@ const calculatePlacementScore = (
     const packedMinZ = packedItem.position[2] - packedItem.depth/2;
     const packedMaxZ = packedItem.position[2] + packedItem.depth/2;
     
-    // Check for touching faces (approximate, as we're dealing with center positions)
+    // Check for touching faces with smaller tolerance
+    const touchTolerance = 0.01;
+    
     // X-face touching
-    if ((Math.abs(itemMinX - packedMaxX) < 0.01 || Math.abs(itemMaxX - packedMinX) < 0.01) &&
+    if ((Math.abs(itemMinX - packedMaxX) < touchTolerance || Math.abs(itemMaxX - packedMinX) < touchTolerance) &&
         rangesOverlap(itemMinY, itemMaxY, packedMinY, packedMaxY) &&
         rangesOverlap(itemMinZ, itemMaxZ, packedMinZ, packedMaxZ)) {
       touchingFacesCount++;
     }
     
     // Y-face touching
-    if ((Math.abs(itemMinY - packedMaxY) < 0.01 || Math.abs(itemMaxY - packedMinY) < 0.01) &&
+    if ((Math.abs(itemMinY - packedMaxY) < touchTolerance || Math.abs(itemMaxY - packedMinY) < touchTolerance) &&
         rangesOverlap(itemMinX, itemMaxX, packedMinX, packedMaxX) &&
         rangesOverlap(itemMinZ, itemMaxZ, packedMinZ, packedMaxZ)) {
       touchingFacesCount++;
     }
     
     // Z-face touching
-    if ((Math.abs(itemMinZ - packedMaxZ) < 0.01 || Math.abs(itemMaxZ - packedMinZ) < 0.01) &&
+    if ((Math.abs(itemMinZ - packedMaxZ) < touchTolerance || Math.abs(itemMaxZ - packedMinZ) < touchTolerance) &&
         rangesOverlap(itemMinX, itemMaxX, packedMinX, packedMaxX) &&
         rangesOverlap(itemMinY, itemMaxY, packedMinY, packedMaxY)) {
       touchingFacesCount++;
@@ -344,8 +338,8 @@ const calculatePlacementScore = (
     minDistance = Math.min(minDistance, distance);
   }
   
-  // Bonus for touching other items
-  score -= touchingFacesCount * 1000;
+  // Bonus for touching other items - increased reward for touching
+  score -= touchingFacesCount * 1500;
   
   // Bonus for being close to other items (if not touching)
   if (touchingFacesCount === 0 && minDistance !== Infinity) {
@@ -353,16 +347,16 @@ const calculatePlacementScore = (
   }
   
   // COMPONENT 3: Fit quality - how well item fits in the space
-  // Prefer spaces where the item fits snugly
+  // Prefer spaces where the item fits snugly - modified to be less aggressive
   const widthFit = space.width - orientation.width;
   const heightFit = space.height - orientation.height;
   const depthFit = space.depth - orientation.depth;
   
-  // Heavily penalize wasted space
-  score += (widthFit * heightFit * depthFit) * 5;
+  // Penalize wasted space, but less aggressively
+  score += (widthFit * heightFit * depthFit) * 3;
   
-  // Also consider individual dimension fit
-  score += (widthFit + heightFit + depthFit) * 50;
+  // Consider individual dimension fit
+  score += (widthFit + heightFit + depthFit) * 30;
   
   // COMPONENT 4: Volumetric efficiency of the orientation
   // Prioritize orientations that use more of the space's volume
@@ -373,22 +367,21 @@ const calculatePlacementScore = (
   
   // COMPONENT 5: Position preference - favor items closer to origin for stability
   // Penalize distance from origin - floor is priority for stability
-  score += space.y * 200; // Large penalty for height
-  score += (space.x + space.z) * 20; // Smaller penalty for horizontal distance
+  score += space.y * 150; // Large penalty for height
+  score += (space.x + space.z) * 15; // Smaller penalty for horizontal distance
   
-  // COMPONENT 6: NEW - Prefer positions that won't cause future overlaps
-  // This helps avoid creating small unusable spaces
+  // COMPONENT 6: Wasted space risk - reduced penalty
   const wastedSpaceRisk = estimateWastedSpaceRisk(
     space.x, space.y, space.z,
     orientation.width, orientation.height, orientation.depth,
     boxWidth, boxHeight, boxDepth
   );
-  score += wastedSpaceRisk * 300;
+  score += wastedSpaceRisk * 200; // Reduced penalty weight
   
   return score;
 };
 
-// NEW FUNCTION: Estimate risk of creating wasted spaces
+// NEW IMPROVED: Estimate risk of creating wasted spaces (with reduced penalties)
 const estimateWastedSpaceRisk = (
   x: number, y: number, z: number,
   width: number, height: number, depth: number,
@@ -396,35 +389,38 @@ const estimateWastedSpaceRisk = (
 ): number => {
   let risk = 0;
   
+  // Increased gap tolerance - consider spaces up to 15cm as usable
+  const smallGapThreshold = 15;
+  
   // If placement creates a narrow gap against a wall, penalize it
-  // X direction gaps
-  if (x > 0 && x < 10) {
+  // X direction gaps - reduced penalties
+  if (x > 0 && x < smallGapThreshold) {
     // Small gap between item and left wall
-    risk += (10 - x) * 2;
+    risk += (smallGapThreshold - x) * 1;
   }
-  if (x + width < boxWidth && boxWidth - (x + width) < 10) {
+  if (x + width < boxWidth && boxWidth - (x + width) < smallGapThreshold) {
     // Small gap between item and right wall
-    risk += (10 - (boxWidth - (x + width))) * 2;
+    risk += (smallGapThreshold - (boxWidth - (x + width))) * 1;
   }
   
-  // Y direction gaps (vertical)
-  if (y > 0 && y < 10) {
+  // Y direction gaps (vertical) - reduced penalties
+  if (y > 0 && y < smallGapThreshold) {
     // Small gap above the floor
-    risk += (10 - y) * 3; // Higher penalty for vertical gaps
+    risk += (smallGapThreshold - y) * 1.5; // Still higher penalty for vertical gaps
   }
-  if (y + height < boxHeight && boxHeight - (y + height) < 10) {
+  if (y + height < boxHeight && boxHeight - (y + height) < smallGapThreshold) {
     // Small gap below ceiling
-    risk += (10 - (boxHeight - (y + height))) * 2;
+    risk += (smallGapThreshold - (boxHeight - (y + height))) * 1;
   }
   
-  // Z direction gaps
-  if (z > 0 && z < 10) {
+  // Z direction gaps - reduced penalties
+  if (z > 0 && z < smallGapThreshold) {
     // Small gap between item and back wall
-    risk += (10 - z) * 2;
+    risk += (smallGapThreshold - z) * 1;
   }
-  if (z + depth < boxDepth && boxDepth - (z + depth) < 10) {
+  if (z + depth < boxDepth && boxDepth - (z + depth) < smallGapThreshold) {
     // Small gap between item and front wall
-    risk += (10 - (boxDepth - (z + depth))) * 2;
+    risk += (smallGapThreshold - (boxDepth - (z + depth))) * 1;
   }
   
   return risk;
@@ -432,7 +428,7 @@ const estimateWastedSpaceRisk = (
 
 // Check if two ranges overlap
 const rangesOverlap = (min1: number, max1: number, min2: number, max2: number) => {
-  return !(max1 < min2 || min1 > max2);
+  return !(max1 <= min2 || min1 >= max2);
 };
 
 // Function to create human-readable rotation text
@@ -515,8 +511,8 @@ const getPossibleOrientations = (item: Item) => {
   return orientations;
 };
 
-// Completely redesigned space splitting algorithm - create 6 possible split spaces and choose the best ones
-const splitSpaceExhaustive = (
+// IMPROVED: Space splitting algorithm - prioritize larger continuous spaces
+const splitSpaceImproved = (
   space: any,
   itemX: number,
   itemY: number,
@@ -600,9 +596,10 @@ const splitSpaceExhaustive = (
     });
   }
   
-  // Filter out spaces that are too small (smaller than 1 cm in any dimension)
+  // Filter out spaces that are too small (smaller than 0.5 cm in any dimension)
+  // More permissive minimum size to allow for more potential placements
   const viableSpaces = possibleSpaces.filter(s => 
-    s.width >= 1 && s.height >= 1 && s.depth >= 1
+    s.width >= 0.5 && s.height >= 0.5 && s.depth >= 0.5
   );
   
   // Sort by volume (largest first)
@@ -613,15 +610,15 @@ const splitSpaceExhaustive = (
   return viableSpaces.length > 0 ? viableSpaces : [];
 };
 
-// Enhanced space cleanup with complete check for space redundancy
-const cleanupSpacesComplete = (spaces: any[]) => {
+// IMPROVED: Space cleanup with better handling of small spaces
+const cleanupSpacesImproved = (spaces: any[]) => {
   if (spaces.length <= 1) return;
   
-  // First pass: Remove tiny spaces
+  // First pass: Remove very tiny spaces
   for (let i = spaces.length - 1; i >= 0; i--) {
     const space = spaces[i];
-    if (space.width < 1 || space.height < 1 || space.depth < 1 || 
-        space.width * space.height * space.depth < 5) { // Ignore very small spaces (less than 5 cubic cm)
+    if (space.width < 0.5 || space.height < 0.5 || space.depth < 0.5 || 
+        space.width * space.height * space.depth < 2) { // Smaller threshold (2 cubic cm)
       spaces.splice(i, 1);
     }
   }
@@ -636,20 +633,7 @@ const cleanupSpacesComplete = (spaces: any[]) => {
     }
   }
   
-  // Third pass: Remove spaces that are contained within multiple other spaces combined
-  for (let i = spaces.length - 1; i >= 0; i--) {
-    // Skip if this space was already removed
-    if (!spaces[i]) continue;
-    
-    const targetSpace = spaces[i];
-    
-    // Check if this space is fully covered by a combination of other spaces
-    if (isSpaceCoveredByCombination(targetSpace, spaces, i)) {
-      spaces.splice(i, 1);
-    }
-  }
-  
-  // Fourth pass: Merge spaces that can be combined
+  // Third pass: Merge spaces that can be combined
   for (let i = 0; i < spaces.length; i++) {
     for (let j = i + 1; j < spaces.length; j++) {
       const mergedSpace = tryMergeSpaces(spaces[i], spaces[j]);
@@ -661,16 +645,16 @@ const cleanupSpacesComplete = (spaces: any[]) => {
     }
   }
   
-  // Limit the number of spaces to prevent excessive fragmentation
-  if (spaces.length > 25) {
+  // Don't limit spaces too aggressively - allow more potential placement options
+  if (spaces.length > 35) {
     // Sort by volume (largest first) before trimming
     spaces.sort((a, b) => 
       (b.width * b.height * b.depth) - (a.width * a.height * a.depth)
     );
-    spaces.length = 25;
+    spaces.length = 35;
   }
   
-  // Final sort by position - prefer lower spaces first for stability
+  // Final sort - prioritize spaces closer to the floor and origin
   spaces.sort((a, b) => {
     // Prioritize spaces closer to the floor (lower Y)
     if (a.y !== b.y) return a.y - b.y;
@@ -680,79 +664,32 @@ const cleanupSpacesComplete = (spaces: any[]) => {
   });
 };
 
-// Check if space is covered by a combination of other spaces
-const isSpaceCoveredByCombination = (targetSpace: any, allSpaces: any[], skipIndex: number): boolean => {
-  // Create a simple 3D grid representation of the target space
-  const resolution = 5; // Check every 5 cm
-  const coveredPoints = new Set();
-  const totalPoints = [];
-  
-  // Generate points to check throughout the target space
-  for (let x = targetSpace.x; x < targetSpace.x + targetSpace.width; x += resolution) {
-    for (let y = targetSpace.y; y < targetSpace.y + targetSpace.height; y += resolution) {
-      for (let z = targetSpace.z; z < targetSpace.z + targetSpace.depth; z += resolution) {
-        // Include the exact edge points
-        const checkX = Math.min(x, targetSpace.x + targetSpace.width - 0.1);
-        const checkY = Math.min(y, targetSpace.y + targetSpace.height - 0.1);
-        const checkZ = Math.min(z, targetSpace.z + targetSpace.depth - 0.1);
-        
-        const point = `${checkX},${checkY},${checkZ}`;
-        totalPoints.push(point);
-      }
-    }
-  }
-  
-  // Skip if no points to check
-  if (totalPoints.length === 0) return false;
-  
-  // Check if each point is covered by any other space
-  for (let i = 0; i < allSpaces.length; i++) {
-    // Skip the target space and already removed spaces
-    if (i === skipIndex || !allSpaces[i]) continue;
-    
-    const space = allSpaces[i];
-    
-    // Check which points this space covers
-    for (const point of totalPoints) {
-      if (coveredPoints.has(point)) continue;
-      
-      const [x, y, z] = point.split(',').map(Number);
-      
-      if (x >= space.x && x < space.x + space.width &&
-          y >= space.y && y < space.y + space.height &&
-          z >= space.z && z < space.z + space.depth) {
-        coveredPoints.add(point);
-      }
-    }
-    
-    // All points covered, can remove this space
-    if (coveredPoints.size === totalPoints.length) {
-      return true;
-    }
-  }
-  
-  return false;
-};
-
 // Check if space1 is fully contained within space2
 const isFullyContained = (space1: any, space2: any): boolean => {
+  // Add a small tolerance to avoid floating point precision issues
+  const tolerance = 0.001;
   return (
-    space1.x >= space2.x &&
-    space1.y >= space2.y &&
-    space1.z >= space2.z &&
-    space1.x + space1.width <= space2.x + space2.width &&
-    space1.y + space1.height <= space2.y + space2.height &&
-    space1.z + space1.depth <= space2.z + space2.depth
+    space1.x >= space2.x - tolerance &&
+    space1.y >= space2.y - tolerance &&
+    space1.z >= space2.z - tolerance &&
+    space1.x + space1.width <= space2.x + space2.width + tolerance &&
+    space1.y + space1.height <= space2.y + space2.height + tolerance &&
+    space1.z + space1.depth <= space2.z + space2.depth + tolerance
   );
 };
 
 // Try to merge two spaces if they can form a larger continuous space
 const tryMergeSpaces = (space1: any, space2: any): any => {
+  // Add tolerance to avoid floating point precision issues
+  const tolerance = 0.01;
+  
   // Check if spaces can be merged along X axis
-  if (space1.y === space2.y && space1.z === space2.z &&
-      space1.height === space2.height && space1.depth === space2.depth) {
+  if (Math.abs(space1.y - space2.y) < tolerance && 
+      Math.abs(space1.z - space2.z) < tolerance &&
+      Math.abs(space1.height - space2.height) < tolerance && 
+      Math.abs(space1.depth - space2.depth) < tolerance) {
     // Space1 is to the left of Space2
-    if (space1.x + space1.width === space2.x) {
+    if (Math.abs((space1.x + space1.width) - space2.x) < tolerance) {
       return {
         x: space1.x,
         y: space1.y,
@@ -763,7 +700,7 @@ const tryMergeSpaces = (space1: any, space2: any): any => {
       };
     }
     // Space2 is to the left of Space1
-    if (space2.x + space2.width === space1.x) {
+    if (Math.abs((space2.x + space2.width) - space1.x) < tolerance) {
       return {
         x: space2.x,
         y: space1.y,
@@ -776,10 +713,12 @@ const tryMergeSpaces = (space1: any, space2: any): any => {
   }
   
   // Check if spaces can be merged along Y axis
-  if (space1.x === space2.x && space1.z === space2.z &&
-      space1.width === space2.width && space1.depth === space2.depth) {
+  if (Math.abs(space1.x - space2.x) < tolerance && 
+      Math.abs(space1.z - space2.z) < tolerance &&
+      Math.abs(space1.width - space2.width) < tolerance && 
+      Math.abs(space1.depth - space2.depth) < tolerance) {
     // Space1 is below Space2
-    if (space1.y + space1.height === space2.y) {
+    if (Math.abs((space1.y + space1.height) - space2.y) < tolerance) {
       return {
         x: space1.x,
         y: space1.y,
@@ -790,7 +729,7 @@ const tryMergeSpaces = (space1: any, space2: any): any => {
       };
     }
     // Space2 is below Space1
-    if (space2.y + space2.height === space1.y) {
+    if (Math.abs((space2.y + space2.height) - space1.y) < tolerance) {
       return {
         x: space1.x,
         y: space2.y,
@@ -803,10 +742,12 @@ const tryMergeSpaces = (space1: any, space2: any): any => {
   }
   
   // Check if spaces can be merged along Z axis
-  if (space1.x === space2.x && space1.y === space2.y &&
-      space1.width === space2.width && space1.height === space2.height) {
+  if (Math.abs(space1.x - space2.x) < tolerance && 
+      Math.abs(space1.y - space2.y) < tolerance &&
+      Math.abs(space1.width - space2.width) < tolerance && 
+      Math.abs(space1.height - space2.height) < tolerance) {
     // Space1 is behind Space2
-    if (space1.z + space1.depth === space2.z) {
+    if (Math.abs((space1.z + space1.depth) - space2.z) < tolerance) {
       return {
         x: space1.x,
         y: space1.y,
@@ -817,7 +758,7 @@ const tryMergeSpaces = (space1: any, space2: any): any => {
       };
     }
     // Space2 is behind Space1
-    if (space2.z + space2.depth === space1.z) {
+    if (Math.abs((space2.z + space2.depth) - space1.z) < tolerance) {
       return {
         x: space1.x,
         y: space1.y,
@@ -867,127 +808,4 @@ export const findOptimalBoxSize = (items: Item[]): PackingResult => {
       maxItemDepth = Math.max(maxItemDepth, item.width, item.height, item.depth);
     } else {
       // If the item can't be rotated, respect its orientation
-      maxItemWidth = Math.max(maxItemWidth, item.width);
-      maxItemHeight = Math.max(maxItemHeight, item.height);
-      maxItemDepth = Math.max(maxItemDepth, item.depth);
-    }
-  });
-  
-  // Reduced buffer factor for tighter packing
-  const bufferFactor = 1.1; // Slight increase to help fit all items
-  const targetVolume = totalItemVolume * bufferFactor;
-  
-  // Calculate initial dimensions based on volume cube root, but respect aspect ratios
-  const cubeRoot = Math.pow(targetVolume, 1/3);
-  
-  // Start with dimensions that maintain a reasonable aspect ratio but are not smaller than max item dimensions
-  let initialBox: BoxDimensions = {
-    width: Math.max(maxItemWidth, Math.ceil(cubeRoot * 1.05)), // Slightly wider
-    height: Math.max(maxItemHeight, Math.ceil(cubeRoot * 0.9)), // Slightly shorter (better for stability)
-    depth: Math.max(maxItemDepth, Math.ceil(cubeRoot * 1.05))  // Slightly deeper
-  };
-  
-  // Binary search approach to find optimal dimensions
-  let bestResult: PackingResult | null = null;
-  let iterations = 20; // Increased iterations for better results
-  
-  // Multi-step optimization: first find a box that fits all items
-  // First pass: increase size until all items fit
-  let allItemsFit = false;
-  let growthFactor = 1.05; // Smaller growth factor for more precise sizing
-  let currentBox = { ...initialBox };
-  
-  while (!allItemsFit && iterations > 0) {
-    const result = packItems(currentBox, itemsToProcess);
-    
-    if (result.unpackedItems.length === 0) {
-      // All items fit, save this result
-      bestResult = result;
-      allItemsFit = true;
-    } else {
-      // Items don't fit, increase box size more intelligently
-      // Find the dimension that's most constrained
-      const unpackedVolume = result.unpackedItems.reduce((total, item) => 
-        total + (item.width * item.height * item.depth * item.quantity), 0);
-      
-      // Calculate how much to grow each dimension
-      currentBox = {
-        width: Math.ceil(currentBox.width * growthFactor),
-        height: Math.ceil(currentBox.height * growthFactor),
-        depth: Math.ceil(currentBox.depth * growthFactor)
-      };
-    }
-    
-    iterations--;
-  }
-  
-  // If we found a box that fits all items, try to optimize its dimensions
-  if (bestResult) {
-    // Second pass: try different aspect ratios to minimize volume
-    const baseVolume = bestResult.boxDimensions.width * bestResult.boxDimensions.height * bestResult.boxDimensions.depth;
-    
-    // Try different aspect ratios
-    const aspectVariations = [
-      // Try to make box more cubic
-      { w: 0.98, h: 1.01, d: 1.01 },
-      { w: 1.01, h: 0.98, d: 1.01 },
-      { w: 1.01, h: 1.01, d: 0.98 },
-      // Try different aspect ratios
-      { w: 0.95, h: 1.03, d: 1.02 },
-      { w: 1.03, h: 0.95, d: 1.02 },
-      { w: 1.02, h: 1.03, d: 0.95 },
-      // More aggressive variations
-      { w: 0.93, h: 1.04, d: 1.03 },
-      { w: 1.04, h: 0.93, d: 1.03 },
-      { w: 1.03, h: 1.04, d: 0.93 }
-    ];
-    
-    for (const variation of aspectVariations) {
-      const testBox: BoxDimensions = {
-        width: Math.max(maxItemWidth, Math.ceil(bestResult.boxDimensions.width * variation.w)),
-        height: Math.max(maxItemHeight, Math.ceil(bestResult.boxDimensions.height * variation.h)),
-        depth: Math.max(maxItemDepth, Math.ceil(bestResult.boxDimensions.depth * variation.d))
-      };
-      
-      const testVolume = testBox.width * testBox.height * testBox.depth;
-      
-      // Only test if the new volume is less than or equal to the current best
-      if (testVolume <= baseVolume * 1.01) { // Allow a tiny bit of flexibility
-        const result = packItems(testBox, itemsToProcess);
-        
-        if (result.unpackedItems.length === 0 && 
-            (result.utilizationPercentage > bestResult.utilizationPercentage || 
-             testVolume < baseVolume)) {
-          // Better utilization or smaller volume, update best result
-          bestResult = result;
-        }
-      }
-    }
-    
-    // Third pass: try to shrink the box slightly in each dimension
-    const shrinkFactors = [0.99, 0.98, 0.97, 0.96, 0.95];
-    
-    for (const factor of shrinkFactors) {
-      const testBox: BoxDimensions = {
-        width: Math.max(maxItemWidth, Math.floor(bestResult.boxDimensions.width * factor)),
-        height: Math.max(maxItemHeight, Math.floor(bestResult.boxDimensions.height * factor)),
-        depth: Math.max(maxItemDepth, Math.floor(bestResult.boxDimensions.depth * factor))
-      };
-      
-      const result = packItems(testBox, itemsToProcess);
-      
-      if (result.unpackedItems.length === 0) {
-        // All items still fit in the smaller box
-        bestResult = result;
-      } else {
-        // Items don't fit anymore, stop shrinking
-        break;
-      }
-    }
-    
-    return bestResult;
-  }
-  
-  // If we couldn't find a solution that fits all items, return our best attempt
-  return packItems(currentBox, itemsToProcess);
-};
+      maxItemWidth = Math.max(maxItemWidth,
