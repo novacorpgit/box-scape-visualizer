@@ -496,6 +496,33 @@ const BoxVisualization = ({
                   <meshStandardMaterial color="#a0aec0" roughness={0.8} />
                 </mesh>
                 
+                {/* Box walls */}
+                <group>
+                  {/* Left wall */}
+                  <mesh position={[-scaledWidth/2, 0, 0]} receiveShadow>
+                    <boxGeometry args={[0.02, scaledHeight, scaledDepth]} />
+                    <meshStandardMaterial color="#cbd5e0" roughness={0.8} opacity={0.2} transparent />
+                  </mesh>
+                  
+                  {/* Right wall */}
+                  <mesh position={[scaledWidth/2, 0, 0]} receiveShadow>
+                    <boxGeometry args={[0.02, scaledHeight, scaledDepth]} />
+                    <meshStandardMaterial color="#cbd5e0" roughness={0.8} opacity={0.2} transparent />
+                  </mesh>
+                  
+                  {/* Back wall */}
+                  <mesh position={[0, 0, -scaledDepth/2]} receiveShadow>
+                    <boxGeometry args={[scaledWidth, scaledHeight, 0.02]} />
+                    <meshStandardMaterial color="#cbd5e0" roughness={0.8} opacity={0.2} transparent />
+                  </mesh>
+                  
+                  {/* Front wall */}
+                  <mesh position={[0, 0, scaledDepth/2]} receiveShadow>
+                    <boxGeometry args={[scaledWidth, scaledHeight, 0.02]} />
+                    <meshStandardMaterial color="#cbd5e0" roughness={0.8} opacity={0.2} transparent />
+                  </mesh>
+                </group>
+                
                 {/* Box wireframe */}
                 <mesh position={[0, 0, 0]} receiveShadow>
                   <boxGeometry args={[scaledWidth, scaledHeight, scaledDepth]} />

@@ -25,17 +25,16 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
       return volumeB - volumeA;
     }
     
-    // Secondary sort by the largest dimension to prioritize more "bulky" items
-    const maxDimA = Math.max(a.width, a.height, a.depth);
-    const maxDimB = Math.max(b.width, b.height, b.depth);
-    
-    // If largest dimensions differ, sort by that
-    if (maxDimB !== maxDimA) {
-      return maxDimB - maxDimA;
+    // Secondary sort by height to prioritize taller items first (helps with stability)
+    if (b.height !== a.height) {
+      return b.height - a.height;
     }
     
-    // Third, sort by height to place taller items first (helps with stability)
-    return b.height - a.height;
+    // Third sort by the largest dimension
+    const maxDimA = Math.max(a.width, a.depth);
+    const maxDimB = Math.max(b.width, b.depth);
+    
+    return maxDimB - maxDimA;
   });
 
   // Initialize space with the box - starting from (0,0,0) which is the bottom-left-back corner
@@ -73,6 +72,17 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
       for (let s = 0; s < spaces.length; s++) {
         const space = spaces[s];
 
+        // GRAVITY CONSTRAINT: Skip spaces that aren't on the floor or on top of another item
+        if (space.y > 0) {
+          // Check if this space is supported by an item below
+          const hasSupport = checkIfSpaceHasSupport(space, packedItems, boxWidth, boxDepth);
+          
+          // Skip unsupported spaces - this prevents floating items
+          if (!hasSupport) {
+            continue;
+          }
+        }
+
         for (const orientation of orientations) {
           // Check if the item fits in this space with this orientation
           if (
@@ -86,7 +96,7 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
               space.y + orientation.height <= boxHeight &&
               space.z + orientation.depth <= boxDepth
             ) {
-              // FIX: Use a more precise collision detection with a smaller tolerance
+              // Use a more precise collision detection
               const wouldCollide = checkCollisionPrecise(
                 space.x, 
                 space.y, 
@@ -99,7 +109,7 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
               
               // Only consider this position if there's no collision
               if (!wouldCollide) {
-                // Enhanced scoring system to minimize gaps
+                // Enhanced scoring system to minimize gaps and ensure better placement
                 const score = calculatePlacementScore(space, orientation, boxWidth, boxHeight, boxDepth, packedItems);
                   
                 if (score < bestScore) {
@@ -122,20 +132,18 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
       if (bestSpace !== -1 && bestOrientation !== null && bestPosition !== null) {
         const space = spaces[bestSpace];
         
-        // Calculate the actual position of the item in the box
-        const itemX = bestPosition.x + (bestOrientation.width / 2);
-        const itemY = bestPosition.y + (bestOrientation.height / 2);
-        const itemZ = bestPosition.z + (bestOrientation.depth / 2);
-        
-        // FINAL VALIDATION: Double check that the item is fully within box boundaries
+        // DOUBLE CHECK: Ensure the position is valid - fully inside the box
         if (
-          itemX - bestOrientation.width/2 >= 0 && 
-          itemX + bestOrientation.width/2 <= boxWidth &&
-          itemY - bestOrientation.height/2 >= 0 && 
-          itemY + bestOrientation.height/2 <= boxHeight &&
-          itemZ - bestOrientation.depth/2 >= 0 && 
-          itemZ + bestOrientation.depth/2 <= boxDepth
+          bestPosition.x + bestOrientation.width <= boxWidth &&
+          bestPosition.y + bestOrientation.height <= boxHeight &&
+          bestPosition.z + bestOrientation.depth <= boxDepth &&
+          bestPosition.x >= 0 && bestPosition.y >= 0 && bestPosition.z >= 0
         ) {
+          // Calculate the center position for the item
+          const itemX = bestPosition.x + (bestOrientation.width / 2);
+          const itemY = bestPosition.y + (bestOrientation.height / 2);
+          const itemZ = bestPosition.z + (bestOrientation.depth / 2);
+          
           // Add the item to packed items
           const packedItem: PackedItem = {
             ...item,
@@ -157,7 +165,7 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
           totalVolume += itemVolume;
           packed = true;
 
-          // Use the improved space splitting algorithm with bias towards larger spaces
+          // Use the improved space splitting algorithm
           const newSpaces = splitSpaceImproved(
             space,
             bestPosition.x,
@@ -171,7 +179,7 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
           // Remove the used space and add the new spaces
           spaces.splice(bestSpace, 1, ...newSpaces);
           
-          // Enhanced space management - more aggressive cleanup
+          // Enhanced space management - cleanup after each placement
           cleanupSpacesImproved(spaces);
         }
       }
@@ -195,7 +203,63 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
   };
 };
 
-// NEW: More precise collision detection with smaller tolerance
+// NEW: Check if a space has support from items below it (prevents floating items)
+const checkIfSpaceHasSupport = (
+  space: { x: number, y: number, z: number, width: number, height: number, depth: number }, 
+  packedItems: PackedItem[],
+  boxWidth: number,
+  boxDepth: number
+): boolean => {
+  // Space is on the floor - it's supported
+  if (space.y === 0) {
+    return true;
+  }
+  
+  // Define the bottom face of the space
+  const bottomY = space.y - 0.001; // Small offset to check items directly below
+  
+  // Check if there's any item supporting this space
+  for (const item of packedItems) {
+    // Item boundaries
+    const itemLeft = item.position[0] - item.width / 2;
+    const itemRight = item.position[0] + item.width / 2;
+    const itemTop = item.position[1] + item.height / 2;
+    const itemBack = item.position[2] - item.depth / 2;
+    const itemFront = item.position[2] + item.depth / 2;
+    
+    // Check if item is directly below the space (within a small tolerance)
+    const tolerance = 0.1;
+    if (Math.abs(itemTop - space.y) < tolerance) {
+      // Check horizontal overlap
+      if (
+        // X-axis overlap
+        ((itemLeft <= space.x && itemRight >= space.x) || 
+         (itemLeft <= space.x + space.width && itemRight >= space.x + space.width) ||
+         (itemLeft >= space.x && itemRight <= space.x + space.width)) &&
+        // Z-axis overlap
+        ((itemBack <= space.z && itemFront >= space.z) || 
+         (itemBack <= space.z + space.depth && itemFront >= space.z + space.depth) ||
+         (itemBack >= space.z && itemFront <= space.z + space.depth))
+      ) {
+        // Calculate overlap area
+        const overlapWidth = Math.min(itemRight, space.x + space.width) - Math.max(itemLeft, space.x);
+        const overlapDepth = Math.min(itemFront, space.z + space.depth) - Math.max(itemBack, space.z);
+        
+        // If substantial overlap (at least 25% of the space's base area), consider it supported
+        const spaceBaseArea = space.width * space.depth;
+        const overlapArea = overlapWidth * overlapDepth;
+        
+        if (overlapArea >= 0.25 * spaceBaseArea) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+};
+
+// More precise collision detection with smaller tolerance
 const checkCollisionPrecise = (
   x: number, 
   y: number, 
@@ -252,6 +316,32 @@ const calculatePlacementScore = (
 ) => {
   // Base score components
   let score = 0;
+  
+  // ENHANCED: Prioritize placing items directly on the floor or on other items
+  // Major bonus for floor placement
+  if (space.y === 0) {
+    score -= 20000; // Very large bonus for floor placement
+  } else {
+    // Check if item would be placed directly on another item
+    let directlyOnItem = false;
+    
+    for (const packedItem of packedItems) {
+      const packedItemTop = packedItem.position[1] + packedItem.height/2;
+      
+      // If this space is directly on top of a packed item
+      if (Math.abs(space.y - packedItemTop) < 0.1) {
+        directlyOnItem = true;
+        break;
+      }
+    }
+    
+    if (directlyOnItem) {
+      score -= 15000; // Large bonus for stacking directly on items
+    } else {
+      // Significant penalty for floating spaces
+      score += 10000; 
+    }
+  }
   
   // COMPONENT 1: Corner/Edge Placement Bonus
   // Heavily prioritize corner placements (3 walls)
@@ -339,8 +429,8 @@ const calculatePlacementScore = (
     minDistance = Math.min(minDistance, distance);
   }
   
-  // Bonus for touching other items - increased reward for touching
-  score -= touchingFacesCount * 1500;
+  // Increased bonus for touching other items to encourage tight packing
+  score -= touchingFacesCount * 2000;
   
   // Bonus for being close to other items (if not touching)
   if (touchingFacesCount === 0 && minDistance !== Infinity) {
@@ -348,7 +438,6 @@ const calculatePlacementScore = (
   }
   
   // COMPONENT 3: Fit quality - how well item fits in the space
-  // Prefer spaces where the item fits snugly - modified to be less aggressive
   const widthFit = space.width - orientation.width;
   const heightFit = space.height - orientation.height;
   const depthFit = space.depth - orientation.depth;
@@ -368,7 +457,7 @@ const calculatePlacementScore = (
   
   // COMPONENT 5: Position preference - favor items closer to origin for stability
   // Penalize distance from origin - floor is priority for stability
-  score += space.y * 150; // Large penalty for height
+  score += space.y * 150; // Large penalty for height - encourages items to be placed lower
   score += (space.x + space.z) * 15; // Smaller penalty for horizontal distance
   
   // COMPONENT 6: Wasted space risk - reduced penalty
@@ -382,7 +471,7 @@ const calculatePlacementScore = (
   return score;
 };
 
-// NEW IMPROVED: Estimate risk of creating wasted spaces (with reduced penalties)
+// Estimate risk of creating wasted spaces (with reduced penalties)
 const estimateWastedSpaceRisk = (
   x: number, y: number, z: number,
   width: number, height: number, depth: number,
@@ -561,7 +650,8 @@ const splitSpaceImproved = (
     });
   }
   
-  // Space below the item (Y-)
+  // Space below the item (Y-) - We can omit this to enforce gravity constraint
+  // Items should always be placed on floor or on top of other items
   if (itemY > space.y) {
     possibleSpaces.push({
       x: space.x,
@@ -597,8 +687,7 @@ const splitSpaceImproved = (
     });
   }
   
-  // Filter out spaces that are too small (smaller than 0.5 cm in any dimension)
-  // More permissive minimum size to allow for more potential placements
+  // Filter out spaces that are too small to be useful
   const viableSpaces = possibleSpaces.filter(s => 
     s.width >= 0.5 && s.height >= 0.5 && s.depth >= 0.5
   );
@@ -657,7 +746,11 @@ const cleanupSpacesImproved = (spaces: any[]) => {
   
   // Final sort - prioritize spaces closer to the floor and origin
   spaces.sort((a, b) => {
-    // Prioritize spaces closer to the floor (lower Y)
+    // Prioritize spaces on the floor
+    if (a.y === 0 && b.y !== 0) return -1;
+    if (a.y !== 0 && b.y === 0) return 1;
+    
+    // Then prioritize spaces closer to the floor (lower Y)
     if (a.y !== b.y) return a.y - b.y;
     
     // Then prioritize spaces closer to the origin
@@ -774,7 +867,7 @@ const tryMergeSpaces = (space1: any, space2: any): any => {
   return null;
 };
 
-// New function to find the optimal box size with improved algorithm
+// Function to find the optimal box size with improved algorithm
 export const findOptimalBoxSize = (items: Item[]): PackingResult => {
   if (!items || items.length === 0) {
     return {
