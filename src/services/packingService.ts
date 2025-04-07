@@ -926,8 +926,9 @@ export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): 
     }
   });
   
-  // Initial guess for box dimensions with buffer factor
-  const bufferFactor = aggressive ? 1.1 : 1.25; // 15% buffer
+  // Initial guess for box dimensions with buffer factor - using a larger buffer for optimization
+  // When optimizing, we want to ensure ALL items fit, so we use a larger buffer
+  const bufferFactor = aggressive ? 1.3 : 1.5; // Increased from 1.1/1.25 to 1.3/1.5
   
   // Start with a simple cuboid approach - using cubic root to approximate dimensions
   const cubeRoot = Math.cbrt(totalItemsVolume * bufferFactor);
@@ -959,57 +960,44 @@ export const findOptimalBoxSize = (items: Item[], aggressive: boolean = false): 
   // Try packing items into the initial box
   let packingResult = packItems(boxDimensions, itemsToProcess);
   
-  // If we have unpacked items, try different box configurations
+  // Keep increasing box size until all items fit
+  let attempts = 0;
+  const maxAttempts = 10; // Limit to prevent infinite loops
+  
+  while (packingResult.unpackedItems.length > 0 && attempts < maxAttempts) {
+    attempts++;
+    
+    // Increase box dimensions by 10% each iteration
+    const growthFactor = 1.1;
+    const largerBox = {
+      width: Math.ceil(boxDimensions.width * growthFactor),
+      height: Math.ceil(boxDimensions.height * growthFactor),
+      depth: Math.ceil(boxDimensions.depth * growthFactor)
+    };
+    
+    boxDimensions = largerBox;
+    packingResult = packItems(boxDimensions, itemsToProcess);
+  }
+  
+  // If we still have unpacked items after multiple attempts, try a different approach
   if (packingResult.unpackedItems.length > 0) {
-    // Optimization approach: try multiple box configurations
-    const configurations = [];
+    // Calculate the total volume of all items (including unpacked ones)
+    const totalVolume = itemsToProcess.reduce((sum, item) => 
+      sum + (item.width * item.height * item.depth * item.quantity), 0);
     
-    // Collection of possible box configurations to try
-    configurations.push({ width: Math.ceil(initialWidth * 1.1), height: Math.ceil(initialHeight), depth: Math.ceil(initialDepth) });
-    configurations.push({ width: Math.ceil(initialWidth), height: Math.ceil(initialHeight * 1.1), depth: Math.ceil(initialDepth) });
-    configurations.push({ width: Math.ceil(initialWidth), height: Math.ceil(initialHeight), depth: Math.ceil(initialDepth * 1.1) });
-    configurations.push({ width: Math.ceil(initialWidth * 1.05), height: Math.ceil(initialHeight * 1.05), depth: Math.ceil(initialDepth) });
-    configurations.push({ width: Math.ceil(initialWidth * 1.05), height: Math.ceil(initialHeight), depth: Math.ceil(initialDepth * 1.05) });
-    configurations.push({ width: Math.ceil(initialWidth), height: Math.ceil(initialHeight * 1.05), depth: Math.ceil(initialDepth * 1.05) });
-    configurations.push({ width: Math.ceil(initialWidth * 1.1), height: Math.ceil(initialHeight * 1.1), depth: Math.ceil(initialDepth * 1.1) });
+    // Create a box with dimensions proportional to the largest items but big enough for all
+    // Use a generous buffer factor of 2.0 to ensure everything fits
+    const finalBuffer = 2.0;
+    const finalCubeRoot = Math.cbrt(totalVolume * finalBuffer);
     
-    // For items that couldn't be packed, try a slightly larger box with each configuration
-    let bestResult = packingResult;
+    const finalBox = {
+      width: Math.max(Math.ceil(finalCubeRoot), maxItemWidth * 2),
+      height: Math.max(Math.ceil(finalCubeRoot * 0.7), maxItemHeight * 2), // Slightly lower for stability
+      depth: Math.max(Math.ceil(finalCubeRoot), maxItemDepth * 2)
+    };
     
-    for (const config of configurations) {
-      const result = packItems(config, itemsToProcess);
-      
-      // Evaluate if this configuration is better than the current best
-      if (result.unpackedItems.length < bestResult.unpackedItems.length ||
-         (result.unpackedItems.length === bestResult.unpackedItems.length && 
-          result.utilizationPercentage > bestResult.utilizationPercentage)) {
-        bestResult = result;
-      }
-      
-      // If we've packed all items, no need to try more configurations
-      if (result.unpackedItems.length === 0) {
-        break;
-      }
-    }
-    
-    // Use the best configuration we found
-    packingResult = bestResult;
-    
-    // If we still have unpacked items, try one final approach with 20% larger dimensions
-    if (packingResult.unpackedItems.length > 0) {
-      const largerBox = {
-        width: Math.ceil(initialWidth * 1.2),
-        height: Math.ceil(initialHeight * 1.2),
-        depth: Math.ceil(initialDepth * 1.2)
-      };
-      
-      const finalResult = packItems(largerBox, itemsToProcess);
-      
-      // Only use this result if it packs more items
-      if (finalResult.unpackedItems.length < packingResult.unpackedItems.length) {
-        packingResult = finalResult;
-      }
-    }
+    // Try one final packing with a very large box
+    packingResult = packItems(finalBox, itemsToProcess);
   }
   
   return packingResult;

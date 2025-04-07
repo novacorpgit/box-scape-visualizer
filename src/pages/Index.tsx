@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import BoxDimensionsForm from "@/components/BoxDimensionsForm";
 import { PackingResult, BoxDimensions, Item } from "@/types";
@@ -65,7 +64,7 @@ const Index = () => {
     setIsOptimized(true);
     
     if (optimizedResult.unpackedItems.length > 0) {
-      toast.warning(`${optimizedResult.unpackedItems.length} items couldn't be packed even with optimized box`);
+      toast.warning(`${optimizedResult.unpackedItems.length} items couldn't be packed. The items might be too large for a practical box size.`);
     } else {
       toast.success(`Optimized box size: ${optimizedResult.boxDimensions.width}×${optimizedResult.boxDimensions.height}×${optimizedResult.boxDimensions.depth} cm`);
     }

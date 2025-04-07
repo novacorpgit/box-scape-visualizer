@@ -15,7 +15,7 @@ const OptimizePrompt = ({ onOptimize }: OptimizePromptProps) => {
           <div>
             <h3 className="text-lg font-medium text-blue-700 mb-1">Optimize Box Size</h3>
             <p className="text-sm text-muted-foreground">
-              Find the optimal box size for your items to minimize wasted space
+              Find the optimal box size for your items to ensure all items fit while minimizing wasted space
             </p>
           </div>
           <Button 
