@@ -25,7 +25,7 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
       depth: 20,
       quantity: 1,
       weight: 1,
-      maxStack: 1,
+      maxStack: true, // Default to allow stacking
       color: getRandomColor(),
       allowRotation: true, // Default to allow rotation
     },
@@ -40,7 +40,7 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
       depth: 20,
       quantity: 1,
       weight: 1,
-      maxStack: 1,
+      maxStack: true, // Default to allow stacking
       color: getRandomColor(),
       allowRotation: true, // Default to allow rotation
     };
@@ -60,7 +60,7 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
       if (item.id === id) {
         if (field === "name") {
           return { ...item, [field]: value as string };
-        } else if (field === "allowRotation") {
+        } else if (field === "allowRotation" || field === "maxStack") {
           return { ...item, [field]: value as boolean };
         } else {
           return { ...item, [field]: Number(value) || 0 };
@@ -155,7 +155,7 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor={`weight-${item.id}`}>Weight (kg)</Label>
                   <Input
@@ -168,30 +168,34 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor={`maxStack-${item.id}`}>Max Stack</Label>
-                  <Input
-                    id={`maxStack-${item.id}`}
-                    type="number"
-                    min="1"
-                    value={item.maxStack}
-                    onChange={(e) => handleItemChange(item.id, "maxStack", e.target.value)}
-                    required
-                  />
-                </div>
               </div>
               
-              <div className="flex items-center space-x-2 pt-2">
-                <Checkbox 
-                  id={`allowRotation-${item.id}`} 
-                  checked={item.allowRotation !== false}
-                  onCheckedChange={(checked) => handleItemChange(item.id, "allowRotation", !!checked)}
-                />
-                <div className="flex items-center gap-1">
-                  <Label htmlFor={`allowRotation-${item.id}`} className="cursor-pointer">
-                    Allow rotation and flipping
-                  </Label>
-                  <RotateCw className="h-4 w-4 text-muted-foreground" />
+              <div className="flex flex-col space-y-4 pt-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id={`allowRotation-${item.id}`} 
+                    checked={item.allowRotation !== false}
+                    onCheckedChange={(checked) => handleItemChange(item.id, "allowRotation", !!checked)}
+                  />
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor={`allowRotation-${item.id}`} className="cursor-pointer">
+                      Allow rotation and flipping
+                    </Label>
+                    <RotateCw className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id={`maxStack-${item.id}`} 
+                    checked={item.maxStack === true || item.maxStack > 1}
+                    onCheckedChange={(checked) => handleItemChange(item.id, "maxStack", !!checked)}
+                  />
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor={`maxStack-${item.id}`} className="cursor-pointer">
+                      Allow stacking on top of other items
+                    </Label>
+                  </div>
                 </div>
               </div>
             </div>

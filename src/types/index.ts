@@ -13,7 +13,7 @@ export interface Item {
   depth: number;
   quantity: number;
   weight: number;
-  maxStack: number;
+  maxStack: number | boolean; // Now can be a boolean flag or number
   color: string;
   allowRotation?: boolean; // Controls whether the item can be rotated in 3D space
 }

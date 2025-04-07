@@ -1,4 +1,3 @@
-
 import { BoxDimensions, Item, PackedItem, PackingResult } from "@/types";
 
 // Enhanced 3D bin packing algorithm with improved space utilization
@@ -203,7 +202,21 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
   };
 };
 
-// NEW: Check if a space has support from items below it (prevents floating items)
+// NEW: Check if an item can be stacked based on maxStack property
+const canItemBeStacked = (item: Item): boolean => {
+  // If maxStack is a boolean, use it directly
+  if (typeof item.maxStack === 'boolean') {
+    return item.maxStack;
+  }
+  // If maxStack is a number, it can be stacked if it's greater than 1
+  else if (typeof item.maxStack === 'number') {
+    return item.maxStack > 1;
+  }
+  // Default to true if undefined
+  return true;
+};
+
+// NEW: Function to check if a space has support from items below it (prevents floating items)
 const checkIfSpaceHasSupport = (
   space: { x: number, y: number, z: number, width: number, height: number, depth: number }, 
   packedItems: PackedItem[],
@@ -220,6 +233,11 @@ const checkIfSpaceHasSupport = (
   
   // Check if there's any item supporting this space
   for (const item of packedItems) {
+    // Skip items that can't be stacked on
+    if (!canItemBeStacked(item)) {
+      continue;
+    }
+    
     // Item boundaries
     const itemLeft = item.position[0] - item.width / 2;
     const itemRight = item.position[0] + item.width / 2;

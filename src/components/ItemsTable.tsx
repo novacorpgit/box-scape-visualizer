@@ -26,7 +26,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
       depth: 20,
       quantity: 1,
       weight: 1,
-      maxStack: 1,
+      maxStack: true, // Default to allow stacking
       color: getRandomColor(),
       allowRotation: true, // Default to allow rotation
     },
@@ -43,7 +43,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
       depth: 20,
       quantity: 1,
       weight: 1,
-      maxStack: 1,
+      maxStack: true, // Default to allow stacking
       color: getRandomColor(),
       allowRotation: true, // Default to allow rotation
     };
@@ -63,7 +63,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
       if (item.id === id) {
         if (field === "name") {
           return { ...item, [field]: value as string };
-        } else if (field === "allowRotation") {
+        } else if (field === "allowRotation" || field === "maxStack") {
           return { ...item, [field]: value as boolean };
         } else {
           return { ...item, [field]: Number(value) || 0 };
@@ -102,7 +102,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
     for (let i = startIndex; i < rows.length; i++) {
       const columns = rows[i].split('\t');
       
-      // Expect that columns are in this order: Name, Width, Height, Depth, Quantity, Weight, MaxStack
+      // Expect that columns are in this order: Name, Width, Height, Depth, Quantity, Weight, MaxStack, AllowRotation
       // Fill in as many columns as available
       if (columns.length >= 3) {
         const item: Item = {
@@ -113,9 +113,9 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
           depth: Number(columns[3]) || 20,
           quantity: Number(columns[4]) || 1,
           weight: Number(columns[5]) || 1,
-          maxStack: Number(columns[6]) || 1,
+          maxStack: columns[6] ? (columns[6].toLowerCase() === 'yes' || columns[6] === '1' || columns[6].toLowerCase() === 'true') : true,
           color: getRandomColor(),
-          allowRotation: true, // Default to allow rotation
+          allowRotation: columns[7] ? (columns[7].toLowerCase() === 'yes' || columns[7] === '1' || columns[7].toLowerCase() === 'true') : true,
         };
         newItems.push(item);
       }
@@ -133,7 +133,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
     let clipboardText = "Name\tWidth\tHeight\tDepth\tQuantity\tWeight\tMaxStack\tAllowRotation\n";
     
     items.forEach(item => {
-      clipboardText += `${item.name}\t${item.width}\t${item.height}\t${item.depth}\t${item.quantity}\t${item.weight}\t${item.maxStack}\t${item.allowRotation !== false ? "Yes" : "No"}\n`;
+      clipboardText += `${item.name}\t${item.width}\t${item.height}\t${item.depth}\t${item.quantity}\t${item.weight}\t${item.maxStack === true ? "Yes" : "No"}\t${item.allowRotation !== false ? "Yes" : "No"}\n`;
     });
     
     navigator.clipboard.writeText(clipboardText).then(() => {
@@ -183,7 +183,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
                     <TableHead>Depth (cm)</TableHead>
                     <TableHead>Quantity</TableHead>
                     <TableHead>Weight (kg)</TableHead>
-                    <TableHead>Max Stack</TableHead>
+                    <TableHead>Allow Stacking</TableHead>
                     <TableHead>Allow Rotation</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -245,13 +245,14 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.maxStack}
-                          onChange={(e) => handleCellChange(item.id, "maxStack", e.target.value)}
-                          className="w-full"
-                        />
+                        <div className="flex items-center justify-center">
+                          <Checkbox 
+                            id={`maxStack-${item.id}`} 
+                            checked={item.maxStack === true || (typeof item.maxStack === 'number' && item.maxStack > 1)}
+                            onCheckedChange={(checked) => handleCellChange(item.id, "maxStack", !!checked)}
+                            className="mx-auto"
+                          />
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center">
