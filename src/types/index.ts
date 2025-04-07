@@ -15,7 +15,7 @@ export interface Item {
   weight: number;
   maxStack: number;
   color: string;
-  allowRotation?: boolean; // New optional property to control rotation
+  allowRotation?: boolean; // Controls whether the item can be rotated in 3D space
 }
 
 export interface PackedItem extends Item {
