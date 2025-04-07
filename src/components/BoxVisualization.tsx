@@ -1,3 +1,4 @@
+
 import { useRef, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, TransformControls, Center, Grid, Environment, PerspectiveCamera, Edges } from "@react-three/drei";
@@ -56,6 +57,18 @@ const BoxVisualization = ({
     }
   };
 
+  const captureCanvasImage = async (): Promise<string> => {
+    if (!canvasRef.current) return '';
+    
+    try {
+      const canvas = await html2canvas(canvasRef.current);
+      return canvas.toDataURL("image/png");
+    } catch (error) {
+      console.error("Error capturing canvas:", error);
+      return '';
+    }
+  };
+
   const generatePackingSteps = async () => {
     if (!canvasRef.current || packedItems.length === 0) return;
 
@@ -64,32 +77,41 @@ const BoxVisualization = ({
 
     try {
       const steps: { image: string; itemId: string }[] = [];
-
-      const originalCameraPos = [...cameraPosition] as [number, number, number];
       
+      // Save original camera position
+      const originalCameraPos: [number, number, number] = [...cameraPosition];
+      
+      // Set camera to a good position for capturing steps
       setCameraPosition([5, 5, 5]);
       
+      // Give time for camera position to update
       await new Promise(resolve => setTimeout(resolve, 500));
 
+      // Generate an image for each step
       for (let i = 0; i < packedItems.length; i++) {
+        // Show only items up to current step
         setShowingStep(i);
         
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Give time for rendering
+        await new Promise(resolve => setTimeout(resolve, 300));
         
-        const canvas = await html2canvas(canvasRef.current);
-        const image = canvas.toDataURL("image/png");
+        // Capture image
+        const image = await captureCanvasImage();
         
-        steps.push({
-          image,
-          itemId: packedItems[i].id
-        });
+        if (image) {
+          steps.push({
+            image,
+            itemId: packedItems[i].id
+          });
+        }
       }
 
+      // Reset state
       setShowingStep(null);
       setCameraPosition(originalCameraPos);
       
       setPackingSteps(steps);
-      toast.success("Packing steps generated successfully!");
+      toast.success(`Generated ${steps.length} packing step images!`);
     } catch (error) {
       toast.error("Failed to generate packing steps");
       console.error("Error generating steps:", error);
@@ -266,17 +288,15 @@ const BoxVisualization = ({
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium">Packing Instructions</h3>
               <div className="flex gap-2">
-                {packingSteps.length === 0 && !generatingSteps && (
-                  <Button 
-                    onClick={generatePackingSteps} 
-                    variant="outline" 
-                    size="sm"
-                    disabled={generatingSteps}
-                  >
-                    <PackageCheck className="h-4 w-4 mr-1" />
-                    {generatingSteps ? "Generating..." : "Generate Step Images"}
-                  </Button>
-                )}
+                <Button 
+                  onClick={generatePackingSteps} 
+                  variant="outline" 
+                  size="sm"
+                  disabled={generatingSteps}
+                >
+                  <PackageCheck className="h-4 w-4 mr-1" />
+                  {generatingSteps ? "Generating..." : "Generate Step Images"}
+                </Button>
                 <Button 
                   onClick={printInstructions} 
                   variant="outline" 
@@ -502,7 +522,7 @@ const BoxVisualization = ({
                       />
                       <Edges 
                         threshold={15}
-                        color="#000000e6"
+                        color={0x000000}
                         scale={1.001}
                         lineWidth={1}
                       />
