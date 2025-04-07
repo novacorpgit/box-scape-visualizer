@@ -203,7 +203,7 @@ const Index = () => {
               ) : (
                 <Card className="h-full flex items-center justify-center">
                   <CardContent className="text-center py-20">
-                    <Cube className="h-16 w-16 text-muted-foreground/50 mx-auto mb-6" />
+                    <PackageCheck className="h-16 w-16 text-muted-foreground/50 mx-auto mb-6" />
                     <h3 className="text-xl font-medium mb-2">3D Visualization</h3>
                     <p className="text-muted-foreground max-w-md">
                       Enter box dimensions and items to see your packing layout visualized in 3D
