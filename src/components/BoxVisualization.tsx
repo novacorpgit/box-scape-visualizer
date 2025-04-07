@@ -76,6 +76,9 @@ const BoxVisualization = ({
     toast.info("Generating packing step images...");
 
     try {
+      // Clear existing steps first
+      setPackingSteps([]);
+      
       const steps: { image: string; itemId: string }[] = [];
       
       // Save original camera position
@@ -84,34 +87,48 @@ const BoxVisualization = ({
       // Set camera to a good position for capturing steps
       setCameraPosition([5, 5, 5]);
       
-      // Give time for camera position to update
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Give time for camera position to update - increased delay
+      await new Promise(resolve => setTimeout(resolve, 800));
 
       // Generate an image for each step
       for (let i = 0; i < packedItems.length; i++) {
         // Show only items up to current step
         setShowingStep(i);
         
-        // Give time for rendering
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Give more time for rendering
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Capture image
-        const image = await captureCanvasImage();
-        
-        if (image) {
-          steps.push({
-            image,
-            itemId: packedItems[i].id
-          });
+        try {
+          // Capture image
+          const image = await captureCanvasImage();
+          
+          if (image) {
+            steps.push({
+              image,
+              itemId: packedItems[i].id
+            });
+            
+            // Log to see if images are being captured
+            console.log(`Captured step ${i+1} of ${packedItems.length}`);
+          }
+        } catch (err) {
+          console.error(`Error capturing step ${i+1}:`, err);
         }
       }
 
       // Reset state
       setShowingStep(null);
+      
+      // Wait before resetting camera to ensure all captures complete
+      await new Promise(resolve => setTimeout(resolve, 300));
       setCameraPosition(originalCameraPos);
       
-      setPackingSteps(steps);
-      toast.success(`Generated ${steps.length} packing step images!`);
+      if (steps.length > 0) {
+        setPackingSteps(steps);
+        toast.success(`Created ${steps.length} packing step images!`);
+      } else {
+        toast.error("Failed to generate any step images");
+      }
     } catch (error) {
       toast.error("Failed to generate packing steps");
       console.error("Error generating steps:", error);
@@ -441,6 +458,7 @@ const BoxVisualization = ({
                         <Button 
                           onClick={generatePackingSteps}
                           disabled={generatingSteps}
+                          size="lg"
                         >
                           {generatingSteps ? "Generating..." : "Generate Step Images"}
                         </Button>
@@ -456,6 +474,8 @@ const BoxVisualization = ({
             <Canvas 
               shadows
               gl={{ preserveDrawingBuffer: true }}
+              frameloop="demand"
+              dpr={[1, 2]}
             >
               <PerspectiveCamera 
                 makeDefault 
