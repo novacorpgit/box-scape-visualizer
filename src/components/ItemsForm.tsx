@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Item } from "@/types";
 import { getRandomColor } from "@/utils/colorUtils";
 import { toast } from "sonner";
-import { Trash } from "lucide-react";
+import { Trash, RotateCw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ItemsFormProps {
   onSubmit: (items: Item[]) => void;
@@ -26,6 +27,7 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
       weight: 1,
       maxStack: 1,
       color: getRandomColor(),
+      allowRotation: true, // Default to allow rotation
     },
   ]);
 
@@ -40,6 +42,7 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
       weight: 1,
       maxStack: 1,
       color: getRandomColor(),
+      allowRotation: true, // Default to allow rotation
     };
     setItems([...items, newItem]);
   };
@@ -52,10 +55,16 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
     setItems(items.filter(item => item.id !== id));
   };
 
-  const handleItemChange = (id: string, field: keyof Item, value: number | string) => {
+  const handleItemChange = (id: string, field: keyof Item, value: number | string | boolean) => {
     setItems(items.map(item => {
       if (item.id === id) {
-        return { ...item, [field]: field === "name" ? value : Number(value) || 0 };
+        if (field === "name") {
+          return { ...item, [field]: value as string };
+        } else if (field === "allowRotation") {
+          return { ...item, [field]: value as boolean };
+        } else {
+          return { ...item, [field]: Number(value) || 0 };
+        }
       }
       return item;
     }));
@@ -169,6 +178,20 @@ const ItemsForm = ({ onSubmit, isDisabled }: ItemsFormProps) => {
                     onChange={(e) => handleItemChange(item.id, "maxStack", e.target.value)}
                     required
                   />
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2 pt-2">
+                <Checkbox 
+                  id={`allowRotation-${item.id}`} 
+                  checked={item.allowRotation !== false}
+                  onCheckedChange={(checked) => handleItemChange(item.id, "allowRotation", !!checked)}
+                />
+                <div className="flex items-center gap-1">
+                  <Label htmlFor={`allowRotation-${item.id}`} className="cursor-pointer">
+                    Allow rotation and flipping
+                  </Label>
+                  <RotateCw className="h-4 w-4 text-muted-foreground" />
                 </div>
               </div>
             </div>

@@ -1,4 +1,3 @@
-
 import { BoxDimensions, Item, PackedItem, PackingResult } from "@/types";
 
 // Enhanced 3D bin packing algorithm
@@ -50,7 +49,7 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
       let packed = false;
       const itemVolume = item.width * item.height * item.depth;
 
-      // Try different orientations of the item
+      // Get possible orientations based on rotation preference
       const orientations = getPossibleOrientations(item);
 
       // Find the best space for this item
@@ -76,20 +75,26 @@ export const packItems = (box: BoxDimensions, items: Item[]): PackingResult => {
               space.z + orientation.depth <= boxDepth
             ) {
               // Calculate score for this placement (lower is better)
-              // Modified scoring to minimize gaps
+              // Enhanced scoring system to minimize gaps and encourage tight packing
               const score = 
-                // Prioritize placing items at the corners and edges
+                // Prioritize placing items in corners and against walls
+                (space.x === 0 || space.x + orientation.width === boxWidth ? -5000 : 0) +
+                (space.y === 0 || space.y + orientation.height === boxHeight ? -5000 : 0) +
+                (space.z === 0 || space.z + orientation.depth === boxDepth ? -5000 : 0) +
+                
+                // Prioritize placing items flat against existing items
+                // by preferring spaces that minimize the remaining space in each dimension
                 Math.min(
-                  space.x * (boxWidth - space.x - orientation.width),
-                  space.y * (boxHeight - space.y - orientation.height),
-                  space.z * (boxDepth - space.z - orientation.depth)
+                  (space.width - orientation.width) * 10,
+                  (space.height - orientation.height) * 10,
+                  (space.depth - orientation.depth) * 10
                 ) +
-                // Prioritize placing items in corners (lower is better)
-                (space.x + space.y + space.z) * 10 +
-                // Prioritize placing items flat against other items or walls
-                (Math.abs(space.x) < 0.001 || Math.abs(space.x + orientation.width - boxWidth) < 0.001 ? -1000 : 0) +
-                (Math.abs(space.y) < 0.001 || Math.abs(space.y + orientation.height - boxHeight) < 0.001 ? -1000 : 0) +
-                (Math.abs(space.z) < 0.001 || Math.abs(space.z + orientation.depth - boxDepth) < 0.001 ? -1000 : 0);
+                
+                // Prefer to use spaces close to the origin (bottom-left-back corner)
+                (space.x + space.y + space.z) * 5 +
+                
+                // Prefer orientations that minimize the height
+                orientation.height * 2;
 
               if (score < bestScore) {
                 bestScore = score;
@@ -332,13 +337,13 @@ const getRotationText = (rotation: [number, number, number]): string => {
   return `rotated ${axes.join(' and ')}`;
 };
 
-// Get all possible orientations of an item based on its stackability
+// Get all possible orientations of an item based on its rotation preference
 const getPossibleOrientations = (item: Item) => {
   const orientations = [];
   
-  // Consider the item's maximum stacking constraint
-  // If maxStack is 1 or undefined, only allow the original orientation
-  if (!item.maxStack || item.maxStack === 1) {
+  // Consider the item's rotation preference
+  // If allowRotation is false, only allow the original orientation
+  if (item.allowRotation === false) {
     orientations.push({
       width: item.width,
       height: item.height,

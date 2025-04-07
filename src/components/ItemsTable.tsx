@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useRef } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Item } from "@/types";
 import { getRandomColor } from "@/utils/colorUtils";
 import { toast } from "sonner";
-import { Copy, ClipboardPaste, Table as TableIcon } from "lucide-react";
+import { Copy, ClipboardPaste, Table as TableIcon, RotateCw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface ItemsTableProps {
   onSubmit: (items: Item[]) => void;
@@ -25,6 +28,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
       weight: 1,
       maxStack: 1,
       color: getRandomColor(),
+      allowRotation: true, // Default to allow rotation
     },
   ]);
 
@@ -41,6 +45,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
       weight: 1,
       maxStack: 1,
       color: getRandomColor(),
+      allowRotation: true, // Default to allow rotation
     };
     setItems([...items, newItem]);
   };
@@ -53,13 +58,16 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
     setItems(items.filter(item => item.id !== id));
   };
 
-  const handleCellChange = (id: string, field: keyof Item, value: string) => {
+  const handleCellChange = (id: string, field: keyof Item, value: string | boolean) => {
     setItems(items.map(item => {
       if (item.id === id) {
-        return { 
-          ...item, 
-          [field]: field === "name" ? value : Number(value) || 0 
-        };
+        if (field === "name") {
+          return { ...item, [field]: value as string };
+        } else if (field === "allowRotation") {
+          return { ...item, [field]: value as boolean };
+        } else {
+          return { ...item, [field]: Number(value) || 0 };
+        }
       }
       return item;
     }));
@@ -107,6 +115,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
           weight: Number(columns[5]) || 1,
           maxStack: Number(columns[6]) || 1,
           color: getRandomColor(),
+          allowRotation: true, // Default to allow rotation
         };
         newItems.push(item);
       }
@@ -121,10 +130,10 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
   }, []);
 
   const copyToClipboard = () => {
-    let clipboardText = "Name\tWidth\tHeight\tDepth\tQuantity\tWeight\tMaxStack\n";
+    let clipboardText = "Name\tWidth\tHeight\tDepth\tQuantity\tWeight\tMaxStack\tAllowRotation\n";
     
     items.forEach(item => {
-      clipboardText += `${item.name}\t${item.width}\t${item.height}\t${item.depth}\t${item.quantity}\t${item.weight}\t${item.maxStack}\n`;
+      clipboardText += `${item.name}\t${item.width}\t${item.height}\t${item.depth}\t${item.quantity}\t${item.weight}\t${item.maxStack}\t${item.allowRotation !== false ? "Yes" : "No"}\n`;
     });
     
     navigator.clipboard.writeText(clipboardText).then(() => {
@@ -175,6 +184,7 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
                     <TableHead>Quantity</TableHead>
                     <TableHead>Weight (kg)</TableHead>
                     <TableHead>Max Stack</TableHead>
+                    <TableHead>Allow Rotation</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -242,6 +252,16 @@ const ItemsTable = ({ onSubmit, isDisabled }: ItemsTableProps) => {
                           onChange={(e) => handleCellChange(item.id, "maxStack", e.target.value)}
                           className="w-full"
                         />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center">
+                          <Checkbox 
+                            id={`allowRotation-${item.id}`} 
+                            checked={item.allowRotation !== false}
+                            onCheckedChange={(checked) => handleCellChange(item.id, "allowRotation", !!checked)}
+                            className="mx-auto"
+                          />
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button 
