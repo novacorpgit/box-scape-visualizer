@@ -2,7 +2,7 @@
 import { useState } from "react";
 import ItemsForm from "@/components/ItemsForm";
 import ItemsTable from "@/components/ItemsTable";
-import { Item } from "@/types";
+import { Item, BoxDimensions } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Maximize, Package } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

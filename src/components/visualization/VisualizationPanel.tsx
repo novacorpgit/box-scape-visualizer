@@ -2,7 +2,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PackageCheck } from "lucide-react";
-import { PackingResult } from "@/types";
+import { PackingResult, Item } from "@/types";
 import BoxVisualization from "@/components/BoxVisualization";
 import OptimizedBoxInfo from "@/components/visualization/OptimizedBoxInfo";
 import UnpackedItems from "@/components/visualization/UnpackedItems";
